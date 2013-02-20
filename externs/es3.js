@@ -174,9 +174,11 @@ function parseInt(num, base) {}
 function eval(code) {}
 
 /**
+ * Both a constructor and a function, e.g.: Object(42) instanceof Object
  * @constructor
  * @param {*=} opt_value
  * @nosideeffects
+ * @return {Object}
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Object
  */
 function Object(opt_value) {}
@@ -1105,13 +1107,13 @@ Math.SQRT2;
 
 
 /**
- * @param {?=} opt_yr_num
- * @param {?=} opt_mo_num
- * @param {?=} opt_day_num
- * @param {?=} opt_hr_num
- * @param {?=} opt_min_num
- * @param {?=} opt_sec_num
- * @param {?=} opt_ms_num
+ * @param {number=} opt_yr_num
+ * @param {number=} opt_mo_num
+ * @param {number=} opt_day_num
+ * @param {number=} opt_hr_num
+ * @param {number=} opt_min_num
+ * @param {number=} opt_sec_num
+ * @param {number=} opt_ms_num
  * @constructor
  * @return {string}
  * @nosideeffects
@@ -1695,7 +1697,7 @@ String.prototype.localeCompare = function(other) {};
  * expression.
  *
  * @param {*} regexp
- * @return {Array.<string>} This should really return an Array with a few
+ * @return {?Array.<string>} This should really return an Array with a few
  *     special properties, but we do not have a good way to model this in
  *     our type system. Also see Regexp.prototype.exec.
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/match
@@ -1877,7 +1879,7 @@ RegExp.prototype.compile = function(pattern, opt_flags) {};
 
 /**
  * @param {*} str The string to search.
- * @return {Array.<string>} This should really return an Array with a few
+ * @return {?Array.<string>} This should really return an Array with a few
  *     special properties, but we do not have a good way to model this in
  *     our type system. Also see String.prototype.match.
  * @see http://msdn.microsoft.com/en-us/library/z908hy33(VS.85).aspx
