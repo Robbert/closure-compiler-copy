@@ -253,13 +253,13 @@ Window.prototype.btoa = function(stringToEncode) {};
 Window.prototype.captureEvents;
 
 /**
- * @param {number|undefined?} intervalID
+ * @param {?number|undefined} intervalID
  * @see https://developer.mozilla.org/en/DOM/window.clearInterval
  */
 Window.prototype.clearInterval = function(intervalID) {};
 
 /**
- * @param {number|undefined?} timeoutID
+ * @param {?number|undefined} timeoutID
  * @see https://developer.mozilla.org/en/DOM/window.clearTimeout
  */
 Window.prototype.clearTimeout = function(timeoutID) {};
@@ -376,8 +376,13 @@ Document.prototype.anchors;
  * @type {HTMLCollection}
  */
 Document.prototype.applets;
-/** @type {boolean} */ Document.prototype.async;
-/** @type {string?} */ Document.prototype.baseURI;
+
+/** @type {boolean} */
+Document.prototype.async;
+
+/** @type {?string} */
+Document.prototype.baseURI;
+
 Document.prototype.baseURIObject;
 
 /**
@@ -386,7 +391,9 @@ Document.prototype.baseURIObject;
  */
 Document.prototype.bgColor;
 
-/** @type {HTMLBodyElement} */ Document.prototype.body;
+/** @type {?HTMLBodyElement} */
+Document.prototype.body;
+
 Document.prototype.characterSet;
 
 /**
@@ -396,7 +403,11 @@ Document.prototype.characterSet;
 Document.prototype.compatMode;
 
 Document.prototype.contentType;
-/** @type {string} */ Document.prototype.cookie;
+
+/** @type {string} */
+Document.prototype.cookie;
+
+/** @type {Window} */
 Document.prototype.defaultView;
 
 /**
@@ -506,14 +517,6 @@ Document.prototype.clear = function() {};
 Document.prototype.close;
 
 /**
- * @see https://developer.mozilla.org/en/DOM/document.createElementNS
- * @param {string} namespaceURI
- * @param {string} qualifiedName
- * @return {!Element}
- */
-Document.prototype.createElementNS = function(namespaceURI, qualifiedName) {};
-
-/**
  * @param {string} type
  * @return {Event}
  */
@@ -557,7 +560,7 @@ Document.prototype.getElementsByClassName = function(name) {};
 Document.prototype.getElementsByName = function(name) {};
 
 /**
- * @param {string} namespace
+ * @param {?string} namespace
  * @param {string} name
  * @return {!NodeList}
  * @nosideeffects
@@ -808,7 +811,9 @@ Element.prototype.children;
  * @implicitCast
  */
 Element.prototype.className;
-/** @type {string} */ Element.prototype.dir;
+
+/** @type {string} */
+Element.prototype.dir;
 
 /**
  * Firebug sets this property on elements it is inserting into the DOM.
@@ -816,32 +821,69 @@ Element.prototype.className;
  */
 Element.prototype.firebugIgnore;
 
-/** @type {Node} */ Element.prototype.firstChild;
+/** @type {?Node} */
+Element.prototype.firstChild;
+
 /**
  * @type {string}
  * @implicitCast
  */
 Element.prototype.id;
+
 /**
  * @type {string}
  * @implicitCast
  */
 Element.prototype.innerHTML;
-/** @type {string} */ Element.prototype.lang;
-/** @type {Node} */ Element.prototype.lastChild;
+
+/** @type {string} */
+Element.prototype.lang;
+
+/** @type {?Node} */
+Element.prototype.lastChild;
+
+/** @type {string} */
 Element.prototype.localName;
-Element.prototype.name;
+
+/** @type {?string} */
 Element.prototype.namespaceURI;
-/** @type {Node} */ Element.prototype.nextSibling;
+
+/** @type {?Node} */
+Element.prototype.nextSibling;
+
+/** @type {string} */
 Element.prototype.nodeName;
+
+/** @type {string} */
+Element.prototype.lang;
+
 Element.prototype.nodePrincipal;
-/** @type {number} */ Element.prototype.nodeType;
-Element.prototype.nodeValue;
-/** @type {Document} */ Element.prototype.ownerDocument;
-/** @type {Node} */ Element.prototype.parentNode;
+
+/**
+ * @type {number}
+ * @const
+ * @override
+ */
+Element.prototype.nodeType = Node.ELEMENT_NODE;
+
+/** @const */
+Element.prototype.nodeValue = null;
+
+/** @type {Document} */
+Element.prototype.ownerDocument;
+
+/** @type {?Node} */
+Element.prototype.parentNode;
+
+/** @type {?string} */
 Element.prototype.prefix;
-/** @type {Node} */ Element.prototype.previousSibling;
-/** @type {CSSStyleDeclaration} */ Element.prototype.style;
+
+/** @type {?Node} */
+Element.prototype.previousSibling;
+
+/** @type {CSSStyleDeclaration} */
+Element.prototype.style;
+
 /**
  * @type {number}
  * @implicitCast
@@ -853,7 +895,9 @@ Element.prototype.tabIndex;
  * @implicitCast
  */
 Element.prototype.textContent;
-/** @type {string} */ Element.prototype.title;
+
+/** @type {string} */
+Element.prototype.title;
 
 /**
  * @param {Node} child
@@ -1164,3 +1208,243 @@ HTMLImageElement.prototype.naturalWidth;
  * @see http://www.google.com/codesearch/p?hl=en#eksvcKKj5Ng/mozilla/dom/public/idl/html/nsIDOMNSHTMLImageElement.idl&q=naturalHeight
  */
 HTMLImageElement.prototype.naturalHeight;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozAnimation;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozAnimationDelay;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozAnimationDirection;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozAnimationDuration;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozAnimationFillMode;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozAnimationIterationCount;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozAnimationName;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozAnimationPlayState;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozAnimationTimingFunction;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozAppearance;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBackfaceVisibility;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBackgroundInlinePolicy;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBinding;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderBottomColors;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderEnd;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderEndColor;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderEndStyle;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderEndWidth;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderImage;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderLeftColors;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderRightColors;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderStart;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderStartColor;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderStartStyle;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderStartWidth;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBorderTopColors;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBoxAlign;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBoxDirection;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBoxFlex;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBoxOrdinalGroup;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBoxOrient;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBoxPack;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozBoxSizing;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozColumnCount;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozColumnGap;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozColumnRule;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozColumnRuleColor;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozColumnRuleStyle;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozColumnRuleWidth;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozColumnWidth;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozColumns;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozFloatEdge;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozFontFeatureSettings;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozFontLanguageOverride;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozForceBrokenImageIcon;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozHyphens;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozImageRegion;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozMarginEnd;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozMarginStart;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozOrient;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozOutlineRadius;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozOutlineRadiusBottomleft;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozOutlineRadiusBottomright;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozOutlineRadiusTopleft;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozOutlineRadiusTopright;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozPaddingEnd;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozPaddingStart;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozPerspective;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozPerspectiveOrigin;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozStackSizing;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTabSize;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTextAlignLast;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTextBlink;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTextDecorationColor;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTextDecorationLine;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTextDecorationStyle;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTextSizeAdjust;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTransform;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTransformOrigin;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTransformStyle;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTransition;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTransitionDelay;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTransitionDuration;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTransitionProperty;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozTransitionTimingFunction;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozUserFocus;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozUserInput;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozUserModify;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozUserSelect;
+
+/** @type {string} */
+CSSStyleDeclaration.prototype.MozWindowShadow;

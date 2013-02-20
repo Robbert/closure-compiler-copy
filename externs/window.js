@@ -27,6 +27,7 @@
 /**
  * @constructor
  * @implements {EventTarget}
+ * @see https://developer.mozilla.org/en-US/docs/DOM/window
  */
 function Window() {}
 
