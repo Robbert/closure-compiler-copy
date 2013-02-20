@@ -176,6 +176,25 @@ public enum CompilationLevel {
     options.optimizeParameters = true;
     options.optimizeReturns = true;
     options.optimizeCalls = true;
+
+    // Stricter warnings:
+    options.reportMissingOverride = CheckLevel.WARNING;
+    options.aggressiveVarCheck = CheckLevel.WARNING;
+    options.reportUnknownTypes = CheckLevel.WARNING;
+    options.checkMissingReturn = CheckLevel.WARNING;
+
+    // Obfuscation
+    options.aliasAllStrings = true;
+    // options.aliasExternals = true; // Hurts performance
+    options.moveFunctionDeclarations = true;
+    options.collapsePropertiesOnExternTypes = true;
+    options.devirtualizePrototypeMethods = true;
+
+    options.inferTypes = true;
+    options.disambiguateProperties = true; // causes StackOverflowError
+    options.ambiguateProperties = true;
+    options.inlineProperties = true;
+    options.removeUnusedClassProperties = true;
   }
 
   /**
