@@ -93,6 +93,56 @@ StyleSheet.prototype.setExpression;
  */
 StyleSheet.prototype.removeExpression;
 
+/**
+ * @param {string} name
+ * @param {number=} opt_flags
+ * @return {string|number|boolean|null}
+ * @see http://msdn.microsoft.com/en-us/library/ms536429(VS.85).aspx
+ */
+CSSStyleDeclaration.prototype.getAttribute = function(name, opt_flags) {};
+
+/**
+ * @param {string} name
+ * @return {string|number|boolean|null}
+ * @see http://msdn.microsoft.com/en-us/library/aa358797(VS.85).aspx
+ */
+CSSStyleDeclaration.prototype.getExpression = function(name) {};
+
+/**
+ * @param {string} name
+ * @param {number=} opt_flags
+ * @return {boolean}
+ * @see http://msdn.microsoft.com/en-us/library/ms536696(VS.85).aspx
+ */
+CSSStyleDeclaration.prototype.removeAttribute =
+    function(name, opt_flags) {};
+
+/**
+ * @param {string} name
+ * @return {boolean}
+ * @see http://msdn.microsoft.com/en-us/library/aa358798(VS.85).aspx
+ */
+CSSStyleDeclaration.prototype.removeExpression = function(name) {};
+
+/**
+ * @param {string} name
+ * @param {*} value
+ * @param {number=} opt_flags
+ * @see http://msdn.microsoft.com/en-us/library/ms536739(VS.85).aspx
+ */
+CSSStyleDeclaration.prototype.setAttribute = function(name, value, opt_flags) {};
+
+/**
+ * @param {string} name
+ * @param {string} expr
+ * @param {string=} opt_language
+ * @return {undefined}
+ * @see http://msdn.microsoft.com/en-us/library/ms531196(VS.85).aspx
+ */
+CSSStyleDeclaration.prototype.setExpression =
+    function(name, expr, opt_language) {};
+
+
 // IE-only CSS style names.
 
 /** @type {string} */ CSSProperties.prototype.backgroundPositionX;
