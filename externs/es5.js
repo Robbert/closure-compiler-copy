@@ -20,6 +20,39 @@
  * @externs
  */
 
+/*
+ * JSON API.
+ */
+
+/**
+ * @see http://es5.github.com/x15.12.html
+ * @see https://developer.mozilla.org/En/Using_native_JSON
+ */
+var JSON = {};
+
+/**
+ * @param {string} text
+ * @param {(function(string, *) : *)=} opt_reviver
+ * @return {*}
+ * @throws {Error}
+ * @nosideeffects
+ * @see http://es5.github.com/x15.12.html#x15.12.2
+ * @see http://ejohn.org/blog/ecmascript-5-strict-mode-json-and-more/
+ */
+JSON.parse = function(text, opt_reviver) {};
+
+/**
+ * @param {*} value
+ * @param {(Array.<string>|(function(string, *) : *)|null)=} opt_replacer
+ * @param {(number|string)=} opt_space
+ * @return {string}
+ * @throws {Error}
+ * @nosideeffects
+ * @see http://es5.github.com/x15.12.html#x15.12.3
+ * @see http://ejohn.org/blog/ecmascript-5-strict-mode-json-and-more/
+ */
+JSON.stringify = function(value, opt_replacer, opt_space) {};
+
 
 /**
  * @param {Object} selfObj Specifies the object to which |this| should point
