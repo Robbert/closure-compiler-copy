@@ -31,7 +31,6 @@
  * @externs
  */
 
-
 /**
  * @constructor
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathException
@@ -61,6 +60,15 @@ XPathException.prototype.code;
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathEvaluator
  */
 function XPathEvaluator() {}
+
+/**
+ * @param {string} expr
+ * @param {?XPathNSResolver=} opt_resolver
+ * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathEvaluator-createExpression
+ * @throws XPathException
+ * @throws DOMException
+ */
+Document.prototype.createExpression = function(expr, opt_resolver) {};
 
 /**
  * @param {string} expr
@@ -200,60 +208,70 @@ XPathResult.prototype.iterateNext = function() {};
 XPathResult.prototype.snapshotItem = function(index) {};
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathResult-ANY-TYPE
  */
 XPathResult.ANY_TYPE = 0;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathResult-NUMBER-TYPE
  */
 XPathResult.NUMBER_TYPE = 1;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathResult-STRING-TYPE
  */
 XPathResult.STRING_TYPE = 2;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathResult-BOOLEAN-TYPE
  */
 XPathResult.BOOLEAN_TYPE = 3;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathResult-UNORDERED-NODE-ITERATOR-TYPE
  */
 XPathResult.UNORDERED_NODE_ITERATOR_TYPE = 4;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathResult-ORDERED-NODE-ITERATOR-TYPE
  */
 XPathResult.ORDERED_NODE_ITERATOR_TYPE = 5;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathResult-UNORDERED-NODE-SNAPSHOT-TYPE
  */
 XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE = 6;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathResult-ORDERED-NODE-SNAPSHOT-TYPE
  */
 XPathResult.ORDERED_NODE_SNAPSHOT_TYPE = 7;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathResult-ANY-UNORDERED-NODE-TYPE
  */
 XPathResult.ANY_UNORDERED_NODE_TYPE = 8;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathResult-FIRST-ORDERED-NODE-TYPE
  */
@@ -273,10 +291,30 @@ function XPathNamespace() {}
 XPathNamespace.prototype.ownerElement;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPATH_NAMESPACE_NODE
  */
 XPathNamespace.XPATH_NAMESPACE_NODE = 13;
+
+/**
+ * @const {string}
+ * @override
+ */
+XPathNamespace.prototype.nodeName = "#namespace";
+
+/**
+ * @type {!string} Not null
+ * @override
+ */
+XPathNamespace.prototype.namespaceURI;
+
+/**
+ * @const
+ * @type {number}
+ * @override
+ */
+XPathNamespace.prototype.nodeType = XPathNamespace.XPATH_NAMESPACE_NODE;
 
 /**
  * From http://www.w3.org/TR/XMLHttpRequest/
@@ -352,13 +390,13 @@ XMLHttpRequest.prototype.getAllResponseHeaders = function() {};
 XMLHttpRequest.prototype.getResponseHeader = function(header) {};
 
 /**
- * @type {string}
+ * @type {?string}
  * @see http://www.w3.org/TR/XMLHttpRequest/#responsetext
  */
 XMLHttpRequest.prototype.responseText;
 
 /**
- * @type {Document}
+ * @type {?Document}
  * @see http://www.w3.org/TR/XMLHttpRequest/#responsexml
  */
 XMLHttpRequest.prototype.responseXML;
