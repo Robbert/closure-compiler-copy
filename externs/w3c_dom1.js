@@ -138,19 +138,19 @@ Node.prototype.attributes;
 Node.prototype.childNodes;
 
 /**
- * @type {Node?}
+ * @type {?Node}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#attribute-firstChild
  */
 Node.prototype.firstChild;
 
 /**
- * @type {Node?}
+ * @type {?Node}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#attribute-lastChild
  */
 Node.prototype.lastChild;
 
 /**
- * @type {Node?}
+ * @type {?Node}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#attribute-nextSibling
  */
 Node.prototype.nextSibling;
@@ -174,7 +174,7 @@ Node.prototype.nodeValue;
 Node.prototype.nodeType;
 
 /**
- * @type {Document}
+ * @type {?Document} null for Document nodes
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#attribute-ownerDocument
  */
 Node.prototype.ownerDocument;
@@ -186,7 +186,7 @@ Node.prototype.ownerDocument;
 Node.prototype.parentNode;
 
 /**
- * @type {Node?}
+ * @type {?Node}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#attribute-previousSibling
  */
 Node.prototype.previousSibling;
@@ -215,7 +215,7 @@ Node.prototype.hasChildNodes = function() {};
 
 /**
  * @param {Node} newChild
- * @param {Node?} refChild
+ * @param {?Node} refChild
  * @return {Node}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#method-insertBefore
  */
@@ -237,82 +237,95 @@ Node.prototype.removeChild = function(oldChild) {};
 Node.prototype.replaceChild = function(newChild, oldChild) {};
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.ATTRIBUTE_NODE;
+Node.ATTRIBUTE_NODE = 2;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.CDATA_SECTION_NODE;
+Node.CDATA_SECTION_NODE = 4;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.COMMENT_NODE;
+Node.COMMENT_NODE = 8;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.DOCUMENT_FRAGMENT_NODE;
+Node.DOCUMENT_FRAGMENT_NODE = 11;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.DOCUMENT_NODE;
+Node.DOCUMENT_NODE = 9;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.DOCUMENT_TYPE_NODE;
+Node.DOCUMENT_TYPE_NODE = 10;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.ELEMENT_NODE;
+Node.ELEMENT_NODE = 1;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.ENTITY_NODE;
+Node.ENTITY_NODE = 6;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.ENTITY_REFERENCE_NODE;
+Node.ENTITY_REFERENCE_NODE = 5;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.PROCESSING_INSTRUCTION_NODE;
+Node.PROCESSING_INSTRUCTION_NODE = 7;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.TEXT_NODE;
+Node.TEXT_NODE = 3;
 
 /**
+ * @const
  * @type {number}
- * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
+ * @see http://www.w3.org/TR/2001/WD-DOM-Level-3-XPath-20010830/xpath.html#XPathNodeType
  */
-Node.XPATH_NAMESPACE_NODE;
+Node.XPATH_NAMESPACE_NODE = 13;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1950641247
  */
-Node.NOTATION_NODE;
+Node.NOTATION_NODE = 12;
 
 /**
  * @constructor
@@ -335,10 +348,24 @@ function Document() {}
 Document.prototype.doctype;
 
 /**
- * @type {!Element}
+ * @type {?Element}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#attribute-documentElement
  */
 Document.prototype.documentElement;
+
+/**
+ * @const
+ * @override
+ * @type {number}
+ */
+Document.prototype.nodeType = Node.DOCUMENT_NODE;
+
+/**
+ * @const
+ * @override
+ * @type {null}
+ */
+Document.prototype.ownerDocument = null;
 
 /**
  * @type {DOMImplementation}
@@ -422,6 +449,7 @@ Document.prototype.getElementsByTagName = function(tagname) {};
 
 /**
  * @constructor
+ * @extends {Array}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-536297177
  */
 function NodeList() {}
@@ -567,11 +595,43 @@ Attr.prototype.specified;
 Attr.prototype.value;
 
 /**
+ * @override
+ * @type {string}
+ */
+Attr.prototype.localName;
+
+/**
+ * @type {string}
+ */
+Attr.prototype.nodeName;
+
+/**
+ * @const
+ * @override
+ * @type {number}
+ */
+Attr.prototype.nodeType = Node.ATTRIBUTE_NODE;
+
+/**
  * @constructor
  * @extends {Node}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-745549614
  */
 function Element() {}
+
+/**
+ * @override
+ * @type {string}
+ */
+Element.prototype.localName;
+
+/**
+ * @type {string}
+ */
+Element.prototype.nodeName;
+
+/** @type {Document} */
+Element.prototype.ownerDocument;
 
 /**
  * @type {string}
@@ -684,6 +744,13 @@ Element.prototype.setAttributeNode = function(newAttr) {};
 function Text() {}
 
 /**
+ * @const
+ * @override
+ * @type {number}
+ */
+Text.prototype.nodeType = Node.TEXT_NODE;
+
+/**
  * @param {number} offset
  * @return {Text}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-38853C1D
@@ -698,6 +765,13 @@ Text.prototype.splitText = function(offset) {};
 function Comment() {}
 
 /**
+ * @const
+ * @override
+ * @type {number}
+ */
+Comment.prototype.nodeType = Node.COMMENT_NODE;
+
+/**
  * @constructor
  * @extends {Text}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-667469212
@@ -705,11 +779,25 @@ function Comment() {}
 function CDATASection() {}
 
 /**
+ * @const
+ * @override
+ * @type {number}
+ */
+CDATASection.prototype.nodeType = Node.CDATA_SECTION_NODE;
+
+/**
  * @constructor
  * @extends {Node}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-412266927
  */
 function DocumentType() {}
+
+/**
+ * @const
+ * @override
+ * @type {number}
+ */
+DocumentType.prototype.nodeType = Node.DOCUMENT_TYPE_NODE;
 
 /**
  * @type {NamedNodeMap}
@@ -737,13 +825,20 @@ DocumentType.prototype.notations;
 function Notation() {}
 
 /**
- * @type {string}
+ * @const
+ * @override
+ * @type {number}
+ */
+Notation.prototype.nodeType = Node.NOTATION_NODE;
+
+/**
+ * @type {?string}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-54F2B4D0
  */
 Notation.prototype.publicId;
 
 /**
- * @type {string}
+ * @type {?string}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-E8AAB1D0
  */
 Notation.prototype.systemId;
@@ -756,19 +851,26 @@ Notation.prototype.systemId;
 function Entity() {}
 
 /**
- * @type {string}
+ * @const
+ * @override
+ * @type {number}
+ */
+Entity.prototype.nodeType = Node.ENTITY_NODE;
+
+/**
+ * @type {?string}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-D7303025
  */
 Entity.prototype.publicId;
 
 /**
- * @type {string}
+ * @type {?string}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-D7C29F3E
  */
 Entity.prototype.systemId;
 
 /**
- * @type {string}
+ * @type {?string}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-6ABAEB38
  */
 Entity.prototype.notationName;
@@ -781,11 +883,25 @@ Entity.prototype.notationName;
 function EntityReference() {}
 
 /**
+ * @const
+ * @override
+ * @type {number}
+ */
+EntityReference.prototype.nodeType = Node.ENTITY_REFERENCE_NODE;
+
+/**
  * @constructor
  * @extends {Node}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1004215813
  */
 function ProcessingInstruction() {}
+
+/**
+ * @const
+ * @override
+ * @type {number}
+ */
+ProcessingInstruction.prototype.nodeType = Node.PROCESSING_INSTRUCTION_NODE;
 
 /**
  * @type {string}
@@ -799,12 +915,6 @@ ProcessingInstruction.prototype.data;
  */
 ProcessingInstruction.prototype.target;
 
-
-/**
- * @constructor
- * @implements {EventTarget}
- */
-function Window() {}
 
 /** @override */
 Window.prototype.addEventListener = function(type, listener, useCapture) {};
@@ -850,3 +960,4 @@ Window.prototype.onerror;
 /** @type {?function (Event=)} */ Window.prototype.onsubmit;
 /** @type {?function (Event)} */ Window.prototype.onunload;
 /** @type {?function (Event)} */ Window.prototype.onwheel;
+
