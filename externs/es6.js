@@ -54,12 +54,10 @@ Map.prototype.delete = function (key) {};
 
 Map.prototype.clear = function () {};
 
-/*
+/**
  * In Firefox 18 and earlier .size was a method.
- * @return {number}
- *
  * Map.prototype.size = function (key) {};
+ *
+ * @type {number}
  */
-
-/** @type {number} */
 Map.prototype.size;
