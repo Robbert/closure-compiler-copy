@@ -2695,3 +2695,12 @@ Window.prototype.WebKitMutationObserver;
  * @type {function(new:MutationObserver, function(Array.<MutationRecord>))}
  */
 Window.prototype.MozMutationObserver;
+
+
+/**
+ * @constructor
+ * @implements {HTMLAudioElement}
+ * @param {string=} opt_src
+ * @see http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-audio
+ */
+function Audio(opt_src) {}
