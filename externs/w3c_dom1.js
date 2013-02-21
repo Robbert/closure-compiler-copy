@@ -126,7 +126,7 @@ Node.prototype.removeEventListener = function(type, listener, useCapture) {};
 Node.prototype.dispatchEvent = function(evt) {};
 
 /**
- * @type {NamedNodeMap}
+ * @type {?NamedNodeMap}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#attribute-attributes
  */
 Node.prototype.attributes;
@@ -162,7 +162,7 @@ Node.prototype.nextSibling;
 Node.prototype.nodeName;
 
 /**
- * @type {string}
+ * @type {?string}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#attribute-nodeValue
  */
 Node.prototype.nodeValue;
@@ -751,6 +751,12 @@ function Text() {}
 Text.prototype.nodeType = Node.TEXT_NODE;
 
 /**
+ * @override
+ * @type {string}
+ */
+Text.prototype.nodeValue;
+
+/**
  * @param {number} offset
  * @return {Text}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-38853C1D
@@ -784,6 +790,12 @@ function CDATASection() {}
  * @type {number}
  */
 CDATASection.prototype.nodeType = Node.CDATA_SECTION_NODE;
+
+/**
+ * @override
+ * @type {string}
+ */
+CDATASection.prototype.nodeValue;
 
 /**
  * @constructor

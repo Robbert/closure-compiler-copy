@@ -2699,7 +2699,7 @@ Window.prototype.MozMutationObserver;
 
 /**
  * @constructor
- * @implements {HTMLAudioElement}
+ * @extends {HTMLAudioElement}
  * @param {string=} opt_src
  * @see http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-audio
  */

@@ -796,9 +796,16 @@ Selection.prototype.selectAllChildren;
  */
 Selection.prototype.selectionLanguageChange;
 
-/** @type {NamedNodeMap} */ Element.prototype.attributes;
+/**
+ * @override
+ * @type {!NamedNodeMap}
+ */
+Element.prototype.attributes;
+
 Element.prototype.baseURIObject;
-/** @type {!NodeList} */ Element.prototype.childNodes;
+
+/** @type {!NodeList} */
+Element.prototype.childNodes;
 
 /**
  * @type {!NodeList}
@@ -866,7 +873,10 @@ Element.prototype.nodePrincipal;
  */
 Element.prototype.nodeType = Node.ELEMENT_NODE;
 
-/** @const */
+/**
+ * @override
+ * @const
+ */
 Element.prototype.nodeValue = null;
 
 /** @type {Document} */
