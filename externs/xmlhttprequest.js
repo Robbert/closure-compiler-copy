@@ -33,7 +33,7 @@
  * server.
  *
  * @constructor
- * @implements {EventTarget}
+ * @extends {XMLHttpRequestEventTarget}
  * @see http://www.w3.org/TR/XMLHttpRequest/#xmlhttprequest-object
  */
 function XMLHttpRequest() {}
@@ -103,6 +103,44 @@ XMLHttpRequest.prototype.getResponseHeader = function(header) {};
 XMLHttpRequest.prototype.responseText;
 
 /**
+ * @type {boolean}
+ * @see http://dev.w3.org/2006/webapi/XMLHttpRequest-2/#withcredentials
+ */
+XMLHttpRequest.prototype.withCredentials;
+
+/**
+ * @type {XMLHttpRequestUpload}
+ * @see http://dev.w3.org/2006/webapi/XMLHttpRequest-2/#the-upload-attribute
+ */
+XMLHttpRequest.prototype.upload;
+
+/**
+ * @param {string} mimeType The mime type to override with.
+ */
+XMLHttpRequest.prototype.overrideMimeType = function(mimeType) {};
+
+/**
+ * @type {string}
+ * @see http://dev.w3.org/2006/webapi/XMLHttpRequest-2/#the-responsetype-attribute
+ */
+XMLHttpRequest.prototype.responseType;
+
+/**
+ * @type {*}
+ * @see http://dev.w3.org/2006/webapi/XMLHttpRequest-2/#the-responsetype-attribute
+ */
+XMLHttpRequest.prototype.response;
+
+
+/**
+ * @type {ArrayBuffer}
+ * Implemented as a draft spec in Firefox 4 as the way to get a requested array
+ * buffer from an XMLHttpRequest.
+ * @see https://developer.mozilla.org/En/Using_XMLHttpRequest#Receiving_binary_data_using_JavaScript_typed_arrays
+ */
+XMLHttpRequest.prototype.mozResponseArrayBuffer;
+
+/**
  * @type {?Document}
  * @see http://www.w3.org/TR/XMLHttpRequest/#responsexml
  */
@@ -131,6 +169,38 @@ XMLHttpRequest.prototype.statusText;
  * @see http://www.w3.org/TR/XMLHttpRequest/#onreadystatechange
  */
 XMLHttpRequest.prototype.onreadystatechange;
+
+
+/**
+ * XMLHttpRequestEventTarget defines events for checking the status of a data
+ * transfer between a client and a server. This should be a common base class
+ * for XMLHttpRequest and XMLHttpRequestUpload.
+ *
+ * @constructor
+ * @implements {EventTarget}
+ * @see http://www.w3.org/TR/XMLHttpRequest2/#xmlhttprequesteventtarget
+ */
+function XMLHttpRequestEventTarget() {}
+
+/** @override */
+XMLHttpRequestEventTarget.prototype.addEventListener = function(
+    type, listener, useCapture) {};
+
+/** @override */
+XMLHttpRequestEventTarget.prototype.removeEventListener = function(
+    type, listener, useCapture) {};
+
+/** @override */
+XMLHttpRequestEventTarget.prototype.dispatchEvent = function(evt) {};
+
+/**
+ * An event target to track the status of an upload.
+ *
+ * @constructor
+ * @extends {XMLHttpRequestEventTarget}
+ * @see http://www.w3.org/TR/XMLHttpRequest2/#xmlhttprequestupload
+ */
+function XMLHttpRequestUpload() {}
 
 /**
  * The FormData object represents an ordered collection of entries. Each entry
