@@ -140,9 +140,9 @@ DOMImplementationList.prototype.item = function(index) {};
 function DOMImplementationSource() {}
 
 /**
- * @param {string} namespaceURI
- * @param {string} publicId
- * @param {DocumentType} doctype
+ * @param {?string} namespaceURI
+ * @param {?string} publicId
+ * @param {?DocumentType} doctype
  * @return {Document}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#Level-2-Core-DOM-createDocument
  * @nosideeffects
@@ -255,19 +255,19 @@ Document.prototype.renameNode = function(n, namespaceURI, qualifiedName) {};
 Node.prototype.baseURI;
 
 /**
- * @type {string}
+ * @type {?string}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#ID-NodeNSLocalN
  */
 Node.prototype.localName;
 
 /**
- * @type {string}
+ * @type {?string}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#ID-NodeNSname
  */
 Node.prototype.namespaceURI;
 
 /**
- * @type {string}
+ * @type {?string}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#ID-NodeNSPrefix
  */
 Node.prototype.prefix;
@@ -421,14 +421,14 @@ Node.prototype.querySelector = function(query) {};
 
 /**
  * @param {string} query
- * @return {!NodeList}
+ * @return {?NodeList}
  * @see http://www.w3.org/TR/selectors-api/#queryselectorall
  * @nosideeffects
  */
 Node.prototype.querySelectorAll = function(query) {};
 
 /**
- * @type {Element}
+ * @type {?Element}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#Attr-ownerElement
  */
 Attr.prototype.ownerElement;
@@ -452,7 +452,7 @@ Attr.prototype.schemaTypeInfo;
 Element.prototype.schemaTypeInfo;
 
 /**
- * @param {string} namespaceURI
+ * @param {?string} namespaceURI
  * @param {string} localName
  * @return {Attr}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#ID-ElGetAtNodeNS
@@ -461,7 +461,7 @@ Element.prototype.schemaTypeInfo;
 Element.prototype.getAttributeNodeNS = function(namespaceURI, localName) {};
 
 /**
- * @param {string} namespaceURI
+ * @param {?string} namespaceURI
  * @param {string} localName
  * @return {string}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#ID-ElGetAttrNS
@@ -470,9 +470,9 @@ Element.prototype.getAttributeNodeNS = function(namespaceURI, localName) {};
 Element.prototype.getAttributeNS = function(namespaceURI, localName) {};
 
 /**
- * @param {string} namespaceURI
+ * @param {?string} namespaceURI
  * @param {string} localName
- * @return {!NodeList}
+ * @return {NodeList}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#ID-A6C90942
  * @nosideeffects
  */
@@ -487,7 +487,7 @@ Element.prototype.getElementsByTagNameNS = function(namespaceURI, localName) {};
 Element.prototype.hasAttribute = function(name) {};
 
 /**
- * @param {string} namespaceURI
+ * @param {?string} namespaceURI
  * @param {string} localName
  * @return {boolean}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#ID-ElHasAttrNS
@@ -496,7 +496,7 @@ Element.prototype.hasAttribute = function(name) {};
 Element.prototype.hasAttributeNS = function(namespaceURI, localName) {};
 
 /**
- * @param {string} namespaceURI
+ * @param {?string} namespaceURI
  * @param {string} localName
  * @return {undefined}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#ID-ElRemAtNS
@@ -511,7 +511,7 @@ Element.prototype.removeAttributeNS = function(namespaceURI, localName) {};
 Element.prototype.setAttributeNodeNS = function(newAttr) {};
 
 /**
- * @param {string} namespaceURI
+ * @param {?string} namespaceURI
  * @param {string} qualifiedName
  * @param {string|number|boolean} value Values are converted to strings with
  *     ToString, so we accept number and boolean since both convert easily to
@@ -538,7 +538,7 @@ Element.prototype.setIdAttribute = function(name, isId) {};
 Element.prototype.setIdAttributeNode = function(idAttr, isId) {};
 
 /**
- * @param {string} namespaceURI
+ * @param {?string} namespaceURI
  * @param {string} localName
  * @param {boolean} isId
  * @return {undefined}
@@ -573,37 +573,41 @@ Text.prototype.replaceWholeText = function(newText) {};
 function TypeInfo() {}
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#TypeInfo-DERIVATION_EXTENSION
  */
-TypeInfo.prototype.DERIVATION_EXTENSION;
+TypeInfo.DERIVATION_EXTENSION = 2;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#TypeInfo-DERIVATION_LIST
  */
-TypeInfo.prototype.DERIVATION_LIST;
+TypeInfo.DERIVATION_LIST = 8;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#TypeInfo-DERIVATION_RESTRICTION
  */
-TypeInfo.prototype.DERIVATION_RESTRICTION;
+TypeInfo.DERIVATION_RESTRICTION = 1;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#TypeInfo-DERIVATION_UNION
  */
-TypeInfo.prototype.DERIVATION_UNION;
+TypeInfo.DERIVATION_UNION = 4;
 
 /**
- * @type {string}
+ * @type {?string}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#TypeInfo-typeName
  */
 TypeInfo.prototype.typeName;
 
 /**
- * @type {string}
+ * @type {?string}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#TypeInfo-typeNamespace
  */
 TypeInfo.prototype.typeNamespace;
@@ -625,34 +629,39 @@ TypeInfo.prototype.isDerivedFrom = function(typeNamespaceArg, typeNameArg, deriv
 function UserDataHandler() {}
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#UserDataHandler-CLONED
  */
-UserDataHandler.prototype.NODE_CLONED = 1;
+UserDataHandler.NODE_CLONED = 1;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#UserDataHandler-IMPORTED
  */
-UserDataHandler.prototype.NODE_IMPORTED = 2;
+UserDataHandler.NODE_IMPORTED = 2;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#UserDataHandler-DELETED
  */
-UserDataHandler.prototype.NODE_DELETED = 3;
+UserDataHandler.NODE_DELETED = 3;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#UserDataHandler-RENAMED
  */
-UserDataHandler.prototype.NODE_RENAMED = 4;
+UserDataHandler.NODE_RENAMED = 4;
 
 /**
+ * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-Core/core.html#UserDataHandler-ADOPTED
  */
-UserDataHandler.prototype.NODE_ADOPTED = 5;
+UserDataHandler.NODE_ADOPTED = 5;
 
 /**
  * @param {number} operation
