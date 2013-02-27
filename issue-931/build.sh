@@ -1,0 +1,12 @@
+java -jar ../build/compiler.jar \
+	--externs ../contrib/externs/jquery-1.8.js \
+	--externs ../contrib/externs/webkit_console.js \
+	--js jQueryDeferred.js \
+	--js_output_file jQueryDeferred.min.js \
+	--summary_detail_level 3 \
+	--language_in ECMASCRIPT5_STRICT \
+	--charset UTF-8 \
+	--warning_level VERBOSE \
+	--output_wrapper "/* (c) 2012 Robbert Broersma. All rights reserved. */$NEWLINE;(function(){%output%})();$NEWLINE" \
+	--compilation_level ADVANCED_OPTIMIZATIONS \
+	--formatting PRETTY_PRINT \

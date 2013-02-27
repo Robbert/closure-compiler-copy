@@ -176,6 +176,10 @@ public enum CompilationLevel {
     options.optimizeParameters = true;
     options.optimizeReturns = true;
     options.optimizeCalls = true;
+
+    // Cause issue 931:
+    // http://code.google.com/p/closure-compiler/issues/detail?id=931
+    options.collapsePropertiesOnExternTypes = true;
   }
 
   /**
