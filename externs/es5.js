@@ -16,6 +16,10 @@
 
 /**
  * @fileoverview Definitions for ECMAScript 5.
+ * 
+ * Depends on:
+ *	- es3.js
+ * 
  * @see http://www.ecma-international.org/publications/files/drafts/tc39-2009-025.pdf
  * @externs
  */

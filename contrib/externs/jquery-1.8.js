@@ -928,10 +928,16 @@ jQuery.prototype.find = function(arg1) {};
 /** @return {!jQuery} */
 jQuery.prototype.first = function() {};
 
-/** @see http://docs.jquery.com/Plugins/Authoring */
+/**
+ * @type {Object.<string, Function>}
+ * @see http://docs.jquery.com/Plugins/Authoring
+ */
 jQuery.fn;
 
-/** @see http://docs.jquery.com/Plugins/Authoring */
+/**
+ * @type {Object.<string, Function>}
+ * @see http://docs.jquery.com/Plugins/Authoring
+ */
 $.fn;
 
 /**
@@ -1321,6 +1327,7 @@ jQuery.jqXHR.prototype.fail = function(failCallbacks) {};
 jQuery.jqXHR.prototype.onreadystatechange = function (callback) {};
 
 /**
+ * @override
  * @param {function()=} doneFilter
  * @param {function()=} failFilter
  * @param {function()=} progressFilter

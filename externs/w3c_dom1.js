@@ -922,6 +922,12 @@ ProcessingInstruction.prototype.nodeType = Node.PROCESSING_INSTRUCTION_NODE;
 ProcessingInstruction.prototype.data;
 
 /**
+ * @override
+ * @type {string}
+ */
+ProcessingInstruction.prototype.nodeValue;
+
+/**
  * @type {string}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-1478689192
  */

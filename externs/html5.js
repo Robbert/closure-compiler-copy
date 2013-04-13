@@ -32,6 +32,13 @@
 /**
  * @constructor
  * @extends {HTMLElement}
+ * @see http://www.whatwg.org/specs/web-apps/current-work/#htmlunknownelement
+ */
+function HTMLUnknownElement() {}
+
+/**
+ * @constructor
+ * @extends {HTMLElement}
  */
 function HTMLCanvasElement() {}
 
