@@ -477,6 +477,34 @@ Window.prototype.showModelessDialog;
 Window.prototype.external;
 
 /**
+ * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-setImmediate
+ * @param {Function} fn
+ * @param {...*} var_args
+ * @return {number}
+ */
+function setImmediate(handle, var_args) {};
+
+/**
+ * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-setImmediate
+ * @param {Function} fn
+ * @param {...*} var_args
+ * @return {number}
+ */
+Window.prototype.setImmediate = function (handle, var_args) {};
+
+/**
+ * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-clearImmediate
+ * @param {number} id
+ */
+function clearImmediate(id) {};
+
+/**
+ * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-clearImmediate
+ * @param {number} id
+ */
+Window.prototype.clearImmediate = function (id) {};
+
+/**
  * @constructor
  */
 function History() { };
