@@ -163,7 +163,7 @@ XPathResult.prototype.numberValue;
 XPathResult.prototype.resultType;
 
 /**
- * @type {Node}
+ * @type {?Node}
  * @throws XPathException {@see XPathException.TYPE_ERR}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathResult-singleNodeValue
  */

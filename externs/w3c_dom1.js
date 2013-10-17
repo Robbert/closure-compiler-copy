@@ -529,6 +529,12 @@ CharacterData.prototype.data;
 CharacterData.prototype.length;
 
 /**
+ * @override
+ * @type {string}
+ */
+CharacterData.prototype.nodeValue;
+
+/**
  * @param {string} arg
  * @return {undefined}
  * @see http://www.w3.org/TR/1998/REC-DOM-Level-1-19981001/level-one-core.html#ID-32791A2F
@@ -604,6 +610,12 @@ Attr.prototype.localName;
  * @type {string}
  */
 Attr.prototype.nodeName;
+
+/**
+ * @override
+ * @type {string}
+ */
+Attr.prototype.nodeValue;
 
 /**
  * @const
@@ -776,6 +788,12 @@ function Comment() {}
  * @type {number}
  */
 Comment.prototype.nodeType = Node.COMMENT_NODE;
+
+/**
+ * @override
+ * @type {string}
+ */
+Comment.prototype.nodeValue;
 
 /**
  * @constructor
