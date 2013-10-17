@@ -482,7 +482,7 @@ Window.prototype.external;
  * @param {...*} var_args
  * @return {number}
  */
-function setImmediate(handle, var_args) {};
+function setImmediate(fn, var_args) {};
 
 /**
  * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-setImmediate
@@ -490,7 +490,7 @@ function setImmediate(handle, var_args) {};
  * @param {...*} var_args
  * @return {number}
  */
-Window.prototype.setImmediate = function (handle, var_args) {};
+Window.prototype.setImmediate = function (fn, var_args) {};
 
 /**
  * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-clearImmediate
@@ -975,6 +975,7 @@ Document.prototype.images;
 
 /**
  * @see http://msdn.microsoft.com/en-us/library/ms537470(VS.85).aspx
+ * @type {DocumentNamespaces}
  */
 Document.prototype.namespaces;
 
@@ -1038,6 +1039,7 @@ Element.prototype.createTextRange = function () {};
 
 /**
  * @see http://msdn.microsoft.com/en-us/library/ms535231(VS.85).aspx
+ * @type {Object.<string, string>}
  */
 Element.prototype.currentStyle;
 
@@ -2667,3 +2669,43 @@ CurrentStyle.prototype.zIndex;
 
 /** @type {string} */
 CurrentStyle.prototype.zoom;
+
+/**
+ * @constructor
+ * @extends {Array}
+ */
+function DocumentNamespaces()
+{
+
+}
+
+/**
+ * @param {string} prefix
+ * @param {string} namespace
+ * @param {string=} behavior
+ */
+DocumentNamespaces.prototype.add = function (prefix, namespace, behavior) {};
+
+/**
+ * @param {number} index
+ * @return {Namespace}
+ */
+DocumentNamespaces.prototype.item = function (index) {};
+
+/**
+ * @see http://msdn.microsoft.com/en-us/library/ms535854(v=vs.85).aspx
+ * @constructor
+ */
+function Namespace()
+{
+
+}
+
+/** @type {string} */
+Namespace.prototype.name;
+
+/** @type {string} */
+Namespace.prototype.readyState;
+
+/** @type {string} */
+Namespace.prototype.urn;

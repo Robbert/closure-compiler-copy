@@ -53,6 +53,14 @@ Element.prototype.filled;
 Element.prototype.path;
 
 /**
+ * Set `el.points.value` to change the value
+ * 
+ * @see http://msdn.microsoft.com/en-us/library/bb229518(v=vs.85).aspx
+ * @type {IVgPoints}
+ */
+Element.prototype.points;
+
+/**
  * @type {number|string}
  * @see http://msdn.microsoft.com/en-us/library/bb263877(VS.85).aspx
  */
@@ -75,3 +83,24 @@ Element.prototype.stroked;
  * @see http://msdn.microsoft.com/en-us/library/bb263883(VS.85).aspx
  */
 Element.prototype.strokeweight;
+
+/**
+ * @constructor
+ * @see http://msdn.microsoft.com/en-us/library/bb264109(v=vs.85).aspx
+ */
+function IVgPoints()
+{
+
+}
+
+/**
+ * @type {number}
+ */
+IVgPoints.prototype.length;
+
+/**
+ * @type {string}
+ */
+IVgPoints.prototype.value;
+
+IVgPoints.prototype.item;
