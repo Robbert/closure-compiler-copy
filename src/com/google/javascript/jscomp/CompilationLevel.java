@@ -135,26 +135,25 @@ public enum CompilationLevel {
     options.extractPrototypeMemberDeclarations = true;
     options.collapseVariableDeclarations = true;
     options.convertToDottedProperties = true;
-    options.rewriteFunctionExpressions = true;
     options.labelRenaming = true;
     options.removeDeadCode = true;
     options.optimizeArgumentsArray = true;
     options.collapseObjectLiterals = true;
     options.protectHiddenSideEffects = true;
 
-    // All the advance optimizations.
+    // All the advanced optimizations.
     options.removeClosureAsserts = true;
-    options.aliasKeywords = true;
     options.reserveRawExports = true;
     options.setRenamingPolicy(
         VariableRenamingPolicy.ALL, PropertyRenamingPolicy.ALL_UNQUOTED);
     options.shadowVariables = true;
     options.removeUnusedPrototypeProperties = true;
     options.removeUnusedPrototypePropertiesInExterns = true;
+    options.removeUnusedClassProperties = true;
     options.collapseAnonymousFunctions = true;
     options.collapseProperties = true;
     options.checkGlobalThisLevel = CheckLevel.WARNING;
-    options.rewriteFunctionExpressions = true;
+    options.rewriteFunctionExpressions = false;
     options.smartNameRemoval = true;
     options.inlineConstantVars = true;
     options.setInlineFunctions(Reach.ALL);
@@ -208,10 +207,6 @@ public enum CompilationLevel {
         options.disambiguateProperties = true;
         options.ambiguateProperties = true;
         options.inlineProperties = true;
-        // TODO(johnlenz) :removeUnusedClassProperties isn't strictly a
-        // type based pass, but add it here for now because I may have to
-        // make it into one.
-        options.removeUnusedClassProperties = true;
         break;
       case SIMPLE_OPTIMIZATIONS:
         // TODO(johnlenz): enable peephole type based optimization.

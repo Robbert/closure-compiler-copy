@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Closure Compiler Authors
+ * Copyright 2008 The Closure Compiler Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -295,7 +295,7 @@ Window.prototype.getAttention = function() {};
 
 /**
  * @param {Element} element
- * @param {?string} pseudoElt
+ * @param {?string=} pseudoElt
  * @return {CSSStyleDeclaration}
  * @nosideeffects
  */
@@ -489,6 +489,7 @@ Document.prototype.popupNode;
 Document.prototype.referrer;
 
 /**
+ * @type {StyleSheetList}
  * @see https://developer.mozilla.org/en/DOM/document.styleSheets
  */
 Document.prototype.styleSheets;

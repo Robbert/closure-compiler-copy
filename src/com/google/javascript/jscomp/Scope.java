@@ -279,10 +279,10 @@ public class Scope
     }
 
     public String getInputName() {
-      if (input == null)
+      if (input == null) {
         return "<non-file>";
-      else
-        return input.getName();
+      }
+      return input.getName();
     }
 
     public boolean isNoShadow() {
@@ -551,9 +551,9 @@ public class Scope
    */
   public boolean isDeclared(String name, boolean recurse) {
     Scope scope = this;
-    if (scope.vars.containsKey(name))
+    if (scope.vars.containsKey(name)) {
       return true;
-
+    }
     if (scope.parent != null && recurse) {
       return scope.parent.isDeclared(name, recurse);
     }
@@ -607,7 +607,7 @@ public class Scope
    * Returns whether this is a local scope (i.e. not the global scope).
    */
   public boolean isLocal() {
-    return !isGlobal();
+    return parent != null;
   }
 
   /**
@@ -616,5 +616,23 @@ public class Scope
   public Iterator<Var> getDeclarativelyUnboundVarsWithoutTypes() {
     return Iterators.filter(
         getVars(), DECLARATIVELY_UNBOUND_VARS_WITHOUT_TYPES);
+  }
+
+  static interface TypeResolver {
+    void resolveTypes();
+  }
+
+  private TypeResolver typeResolver;
+
+  /** Resolve all type references. Only used on typed scopes. */
+  void resolveTypes() {
+    if (typeResolver != null) {
+      typeResolver.resolveTypes();
+      typeResolver = null;
+    }
+  }
+
+  void setTypeResolver(TypeResolver resolver) {
+    this.typeResolver = resolver;
   }
 }

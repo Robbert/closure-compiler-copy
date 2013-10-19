@@ -81,6 +81,15 @@ final public class JSDocInfoBuilder {
     }
   }
 
+  /**
+   * Sets the position of original JSDoc comment.
+   */
+  public void recordOriginalCommentPosition(int position) {
+    if (parseDocumentation) {
+      currentInfo.setOriginalCommentPosition(position);
+    }
+  }
+
   public boolean shouldParseDocumentation() {
     return parseDocumentation;
   }
@@ -305,22 +314,6 @@ final public class JSDocInfoBuilder {
   }
 
   /**
-   * Records a template type name.
-   *
-   * @return {@code true} if the template type name was recorded and
-   *     {@code false} if a template type name was already defined.
-   */
-  public boolean recordClassTemplateTypeNames(List<String> names) {
-    if (currentInfo.declareClassTemplateTypeNames(names)) {
-      populated = true;
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-
-  /**
    * Records a thrown type.
    */
   public boolean recordThrowType(JSTypeExpression type) {
@@ -402,6 +395,23 @@ final public class JSDocInfoBuilder {
   public boolean recordStableIdGenerator() {
     if (!currentInfo.isStableIdGenerator()) {
       currentInfo.setStableIdGenerator(true);
+      populated = true;
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  /**
+   * Records that the {@link JSDocInfo} being built should have its {@link
+   * JSDocInfo#isStableIdGenerator()} flag set to {@code true}.
+   *
+   * @return {@code true} if the stableIdGenerator flag was recorded and {@code false} if it was
+   *     already recorded.
+   */
+  public boolean recordMappedIdGenerator() {
+    if (!currentInfo.isMappedIdGenerator()) {
+      currentInfo.setMappedIdGenerator(true);
       populated = true;
       return true;
     } else {
@@ -1043,6 +1053,112 @@ final public class JSDocInfoBuilder {
   }
 
   /**
+   * Returns whether current JSDoc is annotated with {@code @jaggerInject}.
+   */
+  public boolean isJaggerInjectRecorded() {
+    return currentInfo.isJaggerInject();
+  }
+
+  /**
+   * Records annotation with {@code @jaggerInject}.
+   */
+  public boolean recordJaggerInject(boolean inject) {
+    if (!isJaggerInjectRecorded()) {
+      currentInfo.setJaggerInject(inject);
+      populated = true;
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Returns whether current JSDoc is annotated with {@code @jaggerModule}.
+   */
+  public boolean isJaggerModuleRecorded() {
+    return currentInfo.isJaggerModule();
+  }
+
+  /**
+   * Records annotation with {@code @jaggerModule}.
+   */
+  public boolean recordJaggerModule(boolean jaggerModule) {
+    if (!isJaggerModuleRecorded()) {
+      currentInfo.setJaggerModule(jaggerModule);
+      populated = true;
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Returns whether current JSDoc is annotated with {@code @jaggerProvide}.
+   */
+  public boolean isJaggerProvideRecorded() {
+    return currentInfo.isJaggerProvide();
+  }
+
+  /**
+   * Records annotation with {@code @jaggerProvide}.
+   */
+  public boolean recordJaggerProvide(boolean jaggerProvide) {
+    if (!isJaggerProvideRecorded()) {
+      currentInfo.setJaggerProvide(jaggerProvide);
+      populated = true;
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Returns whether current JSDoc is annotated with {@code @wizaction}.
+   */
+  public boolean isWizactionRecorded() {
+    return currentInfo.isWizaction();
+  }
+
+  /**
+   * Records that this method is to be exposed as a wizaction.
+   */
+  public boolean recordWizaction() {
+    if (!isWizactionRecorded()) {
+      currentInfo.setWizaction(true);
+      populated = true;
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  /**
+   * Returns whether current JSDoc is annotated with {@code @disposes}.
+   */
+  public boolean isDisposesRecorded() {
+    return currentInfo.isDisposes();
+  }
+
+  /**
+   * Records a parameter that gets disposed.
+   *
+   * @return {@code true} if all the parameters was recorded and
+   *     {@code false} if a parameter with the same name was already defined
+   */
+  public boolean recordDisposesParameter(List<String> parameterNames) {
+    for (String parameterName : parameterNames) {
+      if ((currentInfo.hasParameter(parameterName) ||
+          parameterName.equals("*")) &&
+          currentInfo.setDisposedParameter(parameterName)) {
+        populated = true;
+      } else {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * Whether the current doc info has other type tags, like
    * {@code @param} or {@code @return} or {@code @type} or etc.
    */
@@ -1078,5 +1194,4 @@ final public class JSDocInfoBuilder {
     return currentInfo.isNoSideEffects() ||
         currentInfo.hasModifies();
   }
-
 }

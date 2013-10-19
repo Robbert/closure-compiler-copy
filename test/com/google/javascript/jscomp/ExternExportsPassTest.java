@@ -19,7 +19,6 @@ package com.google.javascript.jscomp;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
-
 import junit.framework.TestCase;
 
 import java.util.List;
@@ -272,7 +271,6 @@ public class ExternExportsPassTest extends TestCase {
                     "};" +
                     "goog.exportSymbol('externalName', internalName)",
                     "/**\n" +
-                    " * @return {undefined}\n" +
                     " * @constructor\n" +
                     " */\n" +
                     "var externalName = function() {\n};\n");
@@ -393,7 +391,6 @@ public class ExternExportsPassTest extends TestCase {
         "goog.exportSymbol('Foo', Foo);\n" +
         "goog.exportProperty(Foo.prototype, 'm', Foo.prototype.m);",
         "/**\n" +
-        " * @return {undefined}\n" +
         " * @constructor\n" +
         " */\n" +
         "var Foo = function() {\n};\n" +
@@ -443,7 +440,7 @@ public class ExternExportsPassTest extends TestCase {
     assertEquals(0, clientCompileResult.errors.length);
   }
 
-  public void testWarnOnExportFunctionWithUnknownReturnType() {
+  public void testDontWarnOnExportFunctionWithUnknownReturnType() {
     String librarySource =
       "var InternalName = function() {" +
       "  return 6;" +
@@ -452,7 +449,7 @@ public class ExternExportsPassTest extends TestCase {
 
       Result libraryCompileResult = compileAndExportExterns(librarySource);
 
-      assertEquals(1, libraryCompileResult.warnings.length);
+      assertEquals(0, libraryCompileResult.warnings.length);
       assertEquals(0, libraryCompileResult.errors.length);
   }
 
@@ -504,10 +501,62 @@ public class ExternExportsPassTest extends TestCase {
     compileAndCheck("/** @constructor */ var a = function() {};" +
                     "goog.exportSymbol('foobar', a)",
                     "/**\n" +
-                    " * @return {undefined}\n" +
                     " * @constructor\n" +
                     " */\n" +
                     "var foobar = function() {\n};\n");
+  }
+
+  public void testExportParamWithSymbolDefinedInFunction() throws Exception {
+    compileAndCheck(
+        "var id = function() {return 'id'};\n" +
+        "var ft = function() {\n" +
+        "  var id;\n" +
+        "  return 1;\n" +
+        "};\n" +
+        "goog.exportSymbol('id', id);\n",
+        "/**\n" +
+        " * @return {?}\n" +
+        " */\n" +
+        "var id = function() {\n" +
+        "};\n");
+  }
+
+  public void testExportSymbolWithFunctionDefinedAsFunction() {
+
+    compileAndCheck("/**\n" +
+                    " * @param {string} param1\n" +
+                    " * @return {string}\n" +
+                    " */\n" +
+                    "function internalName(param1) {" +
+                      "return param1" +
+                    "};" +
+                    "goog.exportSymbol('externalName', internalName)",
+                    "/**\n" +
+                    " * @param {string} param1\n" +
+                    " * @return {string}\n" +
+                    " */\n" +
+                    "var externalName = function(param1) {\n};\n");
+  }
+
+  public void testExportSymbolWithFunctionAlias() {
+
+    compileAndCheck("/**\n" +
+                    " * @param {string} param1\n" +
+                    " */\n" +
+                    "var y = function(param1) {" +
+                    "};" +
+                    "/**\n" +
+                    " * @param {string} param1\n" +
+                    " * @param {string} param2\n" +
+                    " */\n" +
+                    "var x = function y(param1, param2) {" +
+                    "};" +
+                    "goog.exportSymbol('externalName', y)",
+                    "/**\n" +
+                    " * @param {string} param1\n" +
+                    " * @return {undefined}\n" +
+                    " */\n" +
+                    "var externalName = function(param1) {\n};\n");
   }
 
   private void compileAndCheck(String js, String expected) {
@@ -516,7 +565,7 @@ public class ExternExportsPassTest extends TestCase {
     assertEquals(expected, result.externExport);
   }
 
-  public void testWarnOnExportFunctionWithUnknownParameterTypes() {
+  public void testDontWarnOnExportFunctionWithUnknownParameterTypes() {
     /* This source is missing types for the b and c parameters */
     String librarySource =
       "/**\n" +
@@ -530,7 +579,7 @@ public class ExternExportsPassTest extends TestCase {
 
       Result libraryCompileResult = compileAndExportExterns(librarySource);
 
-      assertEquals(2, libraryCompileResult.warnings.length);
+      assertEquals(0, libraryCompileResult.warnings.length);
       assertEquals(0, libraryCompileResult.errors.length);
   }
 
@@ -551,8 +600,8 @@ public class ExternExportsPassTest extends TestCase {
     CompilerOptions options = new CompilerOptions();
     options.externExportsPath = "externs.js";
 
-    // Turn on IDE mode to get rid of optimizations.
-    options.ideMode = true;
+    // Turn off IDE mode.
+    options.ideMode = false;
 
     /* Check types so we can make sure our exported externs have
      * type information.

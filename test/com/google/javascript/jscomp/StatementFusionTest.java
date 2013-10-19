@@ -22,16 +22,20 @@ package com.google.javascript.jscomp;
  */
 public class StatementFusionTest extends CompilerTestCase  {
 
+  private boolean favorsCommas = false;
+
   @Override
   public void setUp() throws Exception {
     super.setUp();
     enableLineNumberCheck(true);
+    favorsCommas = false;
   }
 
   @Override
   public CompilerPass getProcessor(final Compiler compiler) {
     PeepholeOptimizationsPass peepholePass =
-      new PeepholeOptimizationsPass(compiler, new StatementFusion());
+      new PeepholeOptimizationsPass(
+          compiler, new StatementFusion(favorsCommas));
 
     return peepholePass;
   }
@@ -84,12 +88,59 @@ public class StatementFusionTest extends CompilerTestCase  {
     fuseSame("a();for(var x = b() in y){}");
   }
 
+  public void testFuseIntoVanillaFor() {
+    fuse("a;b;c;for(;g;){}", "for(a,b,c;g;){}");
+    fuse("a;b;c;for(d;g;){}", "for(a,b,c,d;g;){}");
+    fuse("a;b;c;for(d,e;g;){}", "for(a,b,c,d,e;g;){}");
+    fuseSame("a();for(var x;g;){}");
+  }
+
+  public void testFuseIntoLabel() {
+    fuse("a;b;c;label:for(x in y){}", "label:for(x in a,b,c,y){}");
+    fuse("a;b;c;label:for(;g;){}", "label:for(a,b,c;g;){}");
+    fuse("a;b;c;l1:l2:l3:for(;g;){}", "l1:l2:l3:for(a,b,c;g;){}");
+    fuseSame("a;b;c;label:while(true){}");
+  }
+
+  public void testFuseIntoBlock() {
+    fuse("a;b;c;{d;e;f}", "{a,b,c,d,e,f}");
+    fuse("a;b; label: { if(q) break label; bar(); }",
+         "label: { if(a,b,q) break label; bar(); }");
+    fuseSame("a;b;c;{var x;d;e;}");
+    fuseSame("a;b;c;label:{break label;d;e;}");
+  }
+
   public void testNoFuseIntoWhile() {
     fuseSame("a;b;c;while(x){}");
   }
 
   public void testNoFuseIntoDo() {
     fuseSame("a;b;c;do{}while(x)");
+  }
+
+  public void testFavorComma1() {
+    favorsCommas = true;
+    test("a;b;c", "a,b,c");
+  }
+
+  public void testFavorComma2() {
+    favorsCommas = true;
+    test("a;b;c;if(d){}", "if(a,b,c,d){}");
+  }
+
+  public void testFavorComma3() {
+    favorsCommas = true;
+    test("a;b;c;if(d){} d;e;f", "if(a,b,c,d){}d,e,f");
+  }
+
+  public void testFavorComma4() {
+    favorsCommas = true;
+    test("if(d){} d;e;f", "if(d){}d,e,f");
+  }
+
+  public void testFavorComma5() {
+    favorsCommas = true;
+    test("a;b;c;if(d){}d;e;f;if(g){}", "if(a,b,c,d){}if(d,e,f,g){}");
   }
 
   public void testNoGlobalSchopeChanges() {

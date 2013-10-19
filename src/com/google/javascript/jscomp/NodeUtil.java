@@ -35,6 +35,7 @@ import com.google.javascript.rhino.jstype.TernaryValue;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -953,6 +954,11 @@ public final class NodeUtil {
       return false;
     }
 
+    if (callNode.isOnlyModifiesArgumentsCall() &&
+        allArgsUnescapedLocal(callNode)) {
+      return false;
+    }
+
     Node nameNode = callNode.getFirstChild();
     if (nameNode.isName() &&
         CONSTRUCTORS_WITHOUT_SIDE_EFFECTS.contains(nameNode.getString())) {
@@ -999,6 +1005,11 @@ public final class NodeUtil {
     }
 
     if (callNode.isNoSideEffectsCall()) {
+      return false;
+    }
+
+    if (callNode.isOnlyModifiesArgumentsCall() &&
+        allArgsUnescapedLocal(callNode)) {
       return false;
     }
 
@@ -1100,6 +1111,16 @@ public final class NodeUtil {
     }
   }
 
+  static boolean allArgsUnescapedLocal(Node callOrNew) {
+    for (Node arg = callOrNew.getFirstChild().getNext();
+         arg != null; arg = arg.getNext()) {
+      if (!evaluatesToLocalValue(arg)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /**
    * @return Whether the tree can be affected by side-effects or
    * has side-effects.
@@ -1167,6 +1188,15 @@ public final class NodeUtil {
    * 14 call, member () [] .
    */
   static int precedence(int type) {
+    int precedence = precedenceWithDefault(type);
+    if (precedence != -1) {
+      return precedence;
+    }
+    throw new Error("Unknown precedence for " +
+        Token.name(type) + " (type " + type + ")");
+  }
+
+  static int precedenceWithDefault(int type) {
     switch (type) {
       case Token.COMMA:  return 0;
       case Token.ASSIGN_BITOR:
@@ -1237,9 +1267,9 @@ public final class NodeUtil {
       case Token.CAST:
         return 16;
 
-      default: throw new Error("Unknown precedence for " +
-                               Token.name(type) +
-                               " (type " + type + ")");
+      default:
+        // Statements are lower precedence than expressions.
+        return -1;
     }
   }
 
@@ -2297,7 +2327,13 @@ public final class NodeUtil {
     if (endPos == -1) {
       return newName(convention, name);
     }
-    Node node = newName(convention, name.substring(0, endPos));
+    Node node;
+    String nodeName = name.substring(0, endPos);
+    if ("this".equals(nodeName)) {
+      node = IR.thisNode();
+    } else {
+      node = newName(convention, nodeName);
+    }
     int startPos;
     do {
       startPos = endPos + 1;
@@ -2313,6 +2349,29 @@ public final class NodeUtil {
     } while (endPos != -1);
 
     return node;
+  }
+
+  /**
+   * Creates a node representing a qualified name.
+   *
+   * @param name A qualified name (e.g. "foo" or "foo.bar.baz")
+   * @return A NAME or GETPROP node
+   */
+  public static Node newQualifiedNameNodeDeclaration(
+      CodingConvention convention, String name, Node value, JSDocInfo info) {
+    Node result;
+    Node nameNode = newQualifiedNameNode(convention, name);
+    if (nameNode.isName()) {
+      result = IR.var(nameNode, value);
+      result.setJSDocInfo(info);
+    } else if (value != null) {
+      result = IR.exprResult(IR.assign(nameNode, value));
+      result.getFirstChild().setJSDocInfo(info);
+    } else {
+      result = IR.exprResult(nameNode);
+      result.getFirstChild().setJSDocInfo(info);
+    }
+    return result;
   }
 
   /**
@@ -3257,5 +3316,66 @@ public final class NodeUtil {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Given an AST and its copy, map the root node of each scope of main to the
+   * corresponding root node of clone
+   */
+  public static Map<Node, Node> mapMainToClone(Node main, Node clone) {
+    Preconditions.checkState(main.isEquivalentTo(clone));
+    Map<Node, Node> mtoc = new HashMap<Node, Node>();
+    mtoc.put(main, clone);
+    mtocHelper(mtoc, main, clone);
+    return mtoc;
+  }
+
+  private static void mtocHelper(Map<Node, Node> map, Node main, Node clone) {
+    if (main.isFunction()) {
+      map.put(main, clone);
+    }
+    Node mchild = main.getFirstChild(), cchild = clone.getFirstChild();
+    while (mchild != null) {
+      mtocHelper(map, mchild, cchild);
+      mchild = mchild.getNext();
+      cchild = cchild.getNext();
+    }
+  }
+
+  /** Checks that the scope roots marked as changed have indeed changed */
+  public static void verifyScopeChanges(Map<Node, Node> map,
+      Node main, boolean verifyUnchangedNodes,
+      AbstractCompiler compiler) {
+    // compiler is passed only to call compiler.toSource during debugging to see
+    // mismatches in scopes
+
+    // If verifyUnchangedNodes is false, we are comparing the initial AST to the
+    // final AST. Don't check unmarked nodes b/c they may have been changed by
+    // non-loopable passes.
+    // If verifyUnchangedNodes is true, we are comparing the ASTs before & after
+    // a pass. Check all scope roots.
+    final Map<Node, Node> mtoc = map;
+    final boolean checkUnchanged = verifyUnchangedNodes;
+    Node clone = mtoc.get(main);
+    if (main.getChangeTime() > clone.getChangeTime()) {
+      Preconditions.checkState(!main.isEquivalentToShallow(clone));
+    } else if (checkUnchanged) {
+      Preconditions.checkState(main.isEquivalentToShallow(clone));
+    }
+    visitPreOrder(main,
+        new Visitor() {
+          @Override
+          public void visit(Node n) {
+            if (n.isFunction() && mtoc.containsKey(n)) {
+              Node clone = mtoc.get(n);
+              if (n.getChangeTime() > clone.getChangeTime()) {
+                Preconditions.checkState(!n.isEquivalentToShallow(clone));
+              } else if (checkUnchanged) {
+                Preconditions.checkState(n.isEquivalentToShallow(clone));
+              }
+            }
+          }
+        },
+        Predicates.<Node>alwaysTrue());
   }
 }

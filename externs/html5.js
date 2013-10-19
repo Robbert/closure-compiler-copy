@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Closure Compiler Authors
+ * Copyright 2008 The Closure Compiler Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,8 +36,19 @@
  */
 function HTMLUnknownElement() {}
 
+/*
+ * JSON API.
+ */
+
+/**
+ * @see https://developer.mozilla.org/En/Using_native_JSON
+ * @type {!JSONType}
+ */
+Window.prototype.JSON;
+
 /**
  * @constructor
+ * @see http://www.whatwg.org/specs/web-apps/current-work/multipage/the-canvas-element.html#the-canvas-element
  * @extends {HTMLElement}
  */
 function HTMLCanvasElement() {}
@@ -50,11 +61,12 @@ HTMLCanvasElement.prototype.height;
 
 /**
  * @param {string=} opt_type
+ * @param {...*} var_args
  * @return {string}
  * @throws {Error}
  * @nosideeffects
  */
-HTMLCanvasElement.prototype.toDataURL = function(opt_type) {};
+HTMLCanvasElement.prototype.toDataURL = function(opt_type, var_args) {};
 
 /**
  * @param {string} contextId
@@ -259,7 +271,7 @@ CanvasRenderingContext2D.prototype.rect = function(x, y, w, h) {};
  * @param {number} radius
  * @param {number} startAngle
  * @param {number} endAngle
- * @param {boolean} anticlockwise
+ * @param {boolean=} anticlockwise
  * @return {undefined}
  */
 CanvasRenderingContext2D.prototype.arc = function(
@@ -1162,12 +1174,63 @@ HTMLInputElement.prototype.required;
 /** @type {string} */
 HTMLInputElement.prototype.step;
 
+/** @type {Date} */
+HTMLInputElement.prototype.valueAsDate;
+
+/** @type {number} */
+HTMLInputElement.prototype.valueAsNumber;
+
+/**
+ * Changes the form control's value by the value given in the step attribute
+ * multiplied by opt_n.
+ * @param {number=} opt_n step multiplier.  Defaults to 1.
+ */
+HTMLInputElement.prototype.stepDown = function(opt_n) {};
+
+/**
+ * Changes the form control's value by the value given in the step attribute
+ * multiplied by opt_n.
+ * @param {number=} opt_n step multiplier.  Defaults to 1.
+ */
+HTMLInputElement.prototype.stepUp = function(opt_n) {};
+
+
 
 /**
  * @constructor
  * @extends {HTMLElement}
  */
 function HTMLMediaElement() {}
+
+/**
+ * @type {number}
+ * @const
+ */
+HTMLMediaElement.HAVE_NOTHING;  // = 0
+
+/**
+ * @type {number}
+ * @const
+ */
+HTMLMediaElement.HAVE_METADATA;  // = 1
+
+/**
+ * @type {number}
+ * @const
+ */
+HTMLMediaElement.HAVE_CURRENT_DATA;  // = 2
+
+/**
+ * @type {number}
+ * @const
+ */
+HTMLMediaElement.HAVE_FUTURE_DATA;  // = 3
+
+/**
+ * @type {number}
+ * @const
+ */
+HTMLMediaElement.HAVE_ENOUGH_DATA;  // = 4
 
 /** @type {MediaError} */
 HTMLMediaElement.prototype.error;
@@ -1391,32 +1454,32 @@ MessagePort.prototype.onmessage;
 function MessageEvent() {}
 
 /**
- * Returns the data of the message.
+ * The data payload of the message.
  * @type {*}
  */
 MessageEvent.prototype.data;
 
 /**
- * Returns the origin of the message, for server-sent events and cross-document
+ * The origin of the message, for server-sent events and cross-document
  * messaging.
  * @type {string}
  */
 MessageEvent.prototype.origin;
 
 /**
- * Returns the last event ID, for server-sent events.
+ * The last event ID, for server-sent events.
  * @type {string}
  */
 MessageEvent.prototype.lastEventId;
 
 /**
- * Returns the last event ID, for server-sent events.
+ * The window that dispatched the event.
  * @type {Window}
  */
 MessageEvent.prototype.source;
 
 /**
- * Returns the Array of MessagePorts sent with the message, for cross-document
+ * The Array of MessagePorts sent with the message, for cross-document
  * messaging and channel messaging.
  * @type {Array.<MessagePort>}
  */
@@ -1433,7 +1496,6 @@ MessageEvent.prototype.ports;
  * @param {string} lastEventIdArg
  * @param {Window} sourceArg
  * @param {Array.<MessagePort>} portsArg
- * @override
  */
 MessageEvent.prototype.initMessageEvent = function(typeArg, canBubbleArg,
     cancelableArg, dataArg, originArg, lastEventIdArg, sourceArg, portsArg) {};
@@ -1456,9 +1518,17 @@ MessageEvent.prototype.initMessageEventNS = function(namespaceURI, typeArg,
     portsArg) {};
 
 /**
- * HTML5 DataTransfer class
- * @see http://dev.w3.org/html5/spec/dnd.html#the-dragevent-and-datatransfer-interfaces
+ * HTML5 DataTransfer class.
+ *
+ * We say that this extends ClipboardData, because Event.prototype.clipboardData
+ * is a DataTransfer on WebKit but a ClipboardData on IE. The interfaces are so
+ * similar that it's easier to merge them.
+ *
+ * @see http://www.w3.org/TR/2011/WD-html5-20110113/dnd.html
+ * @see http://www.whatwg.org/specs/web-apps/current-work/multipage/dnd.html
+ * @see http://developers.whatwg.org/dnd.html#datatransferitem
  * @constructor
+ * @extends {ClipboardData}
  */
 function DataTransfer() {}
 
@@ -1476,18 +1546,21 @@ DataTransfer.prototype.files;
 
 /**
  * @param {string=} opt_format Format for which to remove data.
+ * @override
  */
 DataTransfer.prototype.clearData = function(opt_format) {};
 
 /**
  * @param {string} format Format for which to set data.
  * @param {string} data Data to add.
+ * @override
  */
 DataTransfer.prototype.setData = function(format, data) {};
 
 /**
  * @param {string} format Format for which to set data.
  * @return {string} Data for the given format.
+ * @override
  */
 DataTransfer.prototype.getData = function(format) { return ''; };
 
@@ -1509,6 +1582,86 @@ DataTransfer.prototype.addElement = function(elem) {};
  * @type {DataTransfer}
  */
 MouseEvent.prototype.dataTransfer;
+
+/**
+ * HTML5 DataTransferItem class.
+ *
+ * @see http://www.w3.org/TR/2011/WD-html5-20110113/dnd.html
+ * @see http://www.whatwg.org/specs/web-apps/current-work/multipage/dnd.html
+ * @see http://developers.whatwg.org/dnd.html#datatransferitem
+ * @constructor
+ */
+var DataTransferItem = function() {};
+
+/** @type {string} */
+DataTransferItem.prototype.kind;
+
+/** @type {string} */
+DataTransferItem.prototype.type;
+
+/**
+ * @param {function(string)} callback
+ * @nosideeffects
+ */
+DataTransferItem.prototype.getAsString = function(callback) {};
+
+/**
+ * @return {?File} The file corresponding to this item, or null.
+ * @nosideeffects
+ */
+DataTransferItem.prototype.getAsFile = function() { return null; };
+
+/**
+ * @return {?Entry} The Entry corresponding to this item, or null. Note that
+ * despite its name,this method only works in Chrome, and will eventually
+ * be renamed to {@code getAsEntry}.
+ * @nosideeffects
+ */
+DataTransferItem.prototype.webkitGetAsEntry = function() { return null; };
+
+/**
+ * HTML5 DataTransferItemList class. There are some discrepancies in the docs
+ * on the whatwg.org site. When in doubt, these prototypes match what is
+ * implemented as of Chrome 30.
+ *
+ * @see http://www.w3.org/TR/2011/WD-html5-20110113/dnd.html
+ * @see http://www.whatwg.org/specs/web-apps/current-work/multipage/dnd.html
+ * @see http://developers.whatwg.org/dnd.html#datatransferitem
+ * @constructor
+ */
+var DataTransferItemList = function() {};
+
+/** @type {number} */
+DataTransferItemList.prototype.length;
+
+/**
+ * @param {number} i File to return from the list.
+ * @return {DataTransferItem} The ith DataTransferItem in the list, or null.
+ * @nosideeffects
+ */
+DataTransferItemList.prototype.item = function(i) { return null; };
+
+/**
+ * Adds an item to the list.
+ * @param {string|!File} data Data for the item being added.
+ * @param {string=} opt_type Mime type of the item being added. MUST be present
+ *     if the {@code data} parameter is a string.
+ */
+DataTransferItemList.prototype.add = function(data, opt_type) {};
+
+/**
+ * Removes an item from the list.
+ * @param {number} i File to remove from the list.
+ */
+DataTransferItemList.prototype.remove = function(i) {};
+
+/**
+ * Removes all items from the list.
+ */
+DataTransferItemList.prototype.clear = function() {};
+
+/** @type {!DataTransferItemList} */
+DataTransfer.prototype.items;
 
 
 /**
@@ -1660,6 +1813,13 @@ History.prototype.pushState = function(data, title, opt_url) {};
  * @param {string=} opt_url The URL for a new session history entry.
  */
 History.prototype.replaceState = function(data, title, opt_url) {};
+
+/**
+ * Pending state object.
+ * @see https://developer.mozilla.org/en-US/docs/Web/Guide/API/DOM/Manipulating_the_browser_history#Reading_the_current_state
+ * @type {*}
+ */
+History.prototype.state;
 
 /**
  * @see http://www.w3.org/TR/html5/history.html#event-definitions
@@ -2217,6 +2377,7 @@ Float64Array.prototype.subarray = function(begin, opt_end) {};
  * @noalias
  * @throws {Error}
  * @nosideeffects
+ * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Typed_arrays/DataView
  */
 function DataView(buffer, opt_byteOffset, opt_byteLength) {}
 
@@ -2465,6 +2626,9 @@ HTMLSelectElement.prototype.autofocus;
  */
 HTMLSelectElement.prototype.labels;
 
+/** @type {HTMLCollection} */
+HTMLSelectElement.prototype.selectedOptions;
+
 /** @type {string} */
 HTMLSelectElement.prototype.validationMessage;
 
@@ -2610,6 +2774,16 @@ Document.prototype.webkitCurrentFullScreenElement;
 /** @type {boolean} */
 Document.prototype.webkitFullScreenKeyboardInputAllowed;
 
+// IE 11 implementation.
+// http://msdn.microsoft.com/en-us/library/ie/dn265028(v=vs.85).aspx
+Element.prototype.msRequestFullscreen = function() {};
+
+/** @type {boolean} */
+Document.prototype.msFullscreenEnabled;
+
+/** @type {Element} */
+Document.prototype.msFullscreenElement;
+
 /** @type {number} */
 Element.ALLOW_KEYBOARD_INPUT = 1;
 
@@ -2711,3 +2885,22 @@ Window.prototype.MozMutationObserver;
  * @see http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-audio
  */
 function Audio(opt_src) {}
+
+/**
+ * @see http://www.w3.org/TR/page-visibility/
+ * @type {string}
+ */
+Document.prototype.visibilityState;
+
+/**
+ * @see http://www.w3.org/TR/page-visibility/
+ * @type {boolean}
+ */
+Document.prototype.hidden;
+
+
+/**
+ * @see https://github.com/promises-aplus/promises-spec
+ * @typedef {{then: !Function}}
+ */
+var Thenable;

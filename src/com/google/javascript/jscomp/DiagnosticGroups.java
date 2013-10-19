@@ -76,14 +76,14 @@ public class DiagnosticGroups {
   // If a group is suppressible on a per-file basis, it should be added
   // to parser/ParserConfig.properties
   static final String DIAGNOSTIC_GROUP_NAMES =
-      "accessControls, ambiguousFunctionDecl, checkRegExp, " +
-      "checkTypes, checkVars, const, constantProperty, deprecated, " +
-      "duplicateMessage, " +
+      "accessControls, ambiguousFunctionDecl, checkEventfulObjectDisposal, " +
+      "checkRegExp, checkStructDictInheritance, checkTypes, checkVars, " +
+      "const, constantProperty, deprecated, duplicateMessage, es3, " +
       "es5Strict, externsValidation, fileoverviewTags, globalThis, " +
       "internetExplorerChecks, invalidCasts, misplacedTypeAnnotation, " +
-      "missingProperties, " +
-      "nonStandardJsDocs, suspiciousCode, strictModuleDepCheck, " +
-      "typeInvalidation, " +
+      "missingProperties, missingProvide, missingRequire, missingReturn," +
+      "nonStandardJsDocs, reportUnknownTypes, suspiciousCode, " +
+      "strictModuleDepCheck, typeInvalidation, " +
       "undefinedNames, undefinedVars, unknownDefines, uselessCode, " +
       "visibility";
 
@@ -108,22 +108,21 @@ public class DiagnosticGroups {
           CheckAccessControls.PRIVATE_OVERRIDE,
           CheckAccessControls.VISIBILITY_MISMATCH);
 
-  public static final DiagnosticGroup CONSTANT_PROPERTY =
-      DiagnosticGroups.registerGroup("constantProperty",
-          CheckAccessControls.CONST_PROPERTY_DELETED,
-          CheckAccessControls.CONST_PROPERTY_REASSIGNED_VALUE);
+  public static final DiagnosticGroup ACCESS_CONTROLS =
+      DiagnosticGroups.registerGroup("accessControls",
+          DEPRECATED, VISIBILITY);
 
   public static final DiagnosticGroup NON_STANDARD_JSDOC =
       DiagnosticGroups.registerGroup("nonStandardJsDocs",
           RhinoErrorReporter.BAD_JSDOC_ANNOTATION);
 
-  public static final DiagnosticGroup ACCESS_CONTROLS =
-      DiagnosticGroups.registerGroup("accessControls",
-          DEPRECATED, VISIBILITY);
-
   public static final DiagnosticGroup INVALID_CASTS =
       DiagnosticGroups.registerGroup("invalidCasts",
           TypeValidator.INVALID_CAST);
+
+  public static final DiagnosticGroup UNNECESSARY_CASTS =
+      DiagnosticGroups.registerGroup("unnecessaryCasts",
+          TypeValidator.UNNECESSARY_CAST);
 
   public static final DiagnosticGroup FILEOVERVIEW_JSDOC =
       DiagnosticGroups.registerDeprecatedGroup("fileoverviewTags");
@@ -159,7 +158,11 @@ public class DiagnosticGroups {
 
   public static final DiagnosticGroup MISSING_PROPERTIES =
       DiagnosticGroups.registerGroup("missingProperties",
-          TypeCheck.INEXISTENT_PROPERTY);
+          TypeCheck.INEXISTENT_PROPERTY_WITH_SUGGESTION);
+
+  public static final DiagnosticGroup MISSING_RETURN =
+      DiagnosticGroups.registerGroup("missingReturn",
+          CheckMissingReturn.MISSING_RETURN_STATEMENT);
 
   public static final DiagnosticGroup INTERNET_EXPLORER_CHECKS =
       DiagnosticGroups.registerGroup("internetExplorerChecks",
@@ -187,14 +190,27 @@ public class DiagnosticGroups {
           TypeValidator.ALL_DIAGNOSTICS,
           TypeCheck.ALL_DIAGNOSTICS);
 
-  public static final DiagnosticGroup CHECK_STRUCT_DICT_INHERITENCE =
-      DiagnosticGroups.registerGroup("checkStructDictInheritence",
+  public static final DiagnosticGroup CHECK_EVENTFUL_OBJECT_DISPOSAL =
+      DiagnosticGroups.registerGroup("checkEventfulObjectDisposal",
+          CheckEventfulObjectDisposal.EVENTFUL_OBJECT_NOT_DISPOSED,
+          CheckEventfulObjectDisposal.EVENTFUL_OBJECT_PURELY_LOCAL,
+          CheckEventfulObjectDisposal.OVERWRITE_PRIVATE_EVENTFUL_OBJECT,
+          CheckEventfulObjectDisposal.UNLISTEN_WITH_ANONBOUND);
+
+  public static final DiagnosticGroup REPORT_UNKNOWN_TYPES =
+      DiagnosticGroups.registerGroup("reportUnknownTypes",
+          TypeCheck.UNKNOWN_EXPR_TYPE);
+
+  public static final DiagnosticGroup CHECK_STRUCT_DICT_INHERITANCE =
+      DiagnosticGroups.registerGroup("checkStructDictInheritance",
           TypeCheck.CONFLICTING_SHAPE_TYPE);
 
   public static final DiagnosticGroup CHECK_VARIABLES =
       DiagnosticGroups.registerGroup("checkVars",
           VarCheck.UNDEFINED_VAR_ERROR,
-          SyntacticScopeCreator.VAR_MULTIPLY_DECLARED_ERROR);
+          VarCheck.VAR_MULTIPLY_DECLARED_ERROR,
+          VariableReferenceCheck.UNDECLARED_REFERENCE,
+          VariableReferenceCheck.REDECLARED_VARIABLE);
 
   public static final DiagnosticGroup CHECK_USELESS_CODE =
       DiagnosticGroups.registerGroup("uselessCode",
@@ -207,6 +223,11 @@ public class DiagnosticGroups {
           CheckAccessControls.CONST_PROPERTY_REASSIGNED_VALUE,
           ConstCheck.CONST_REASSIGNED_VALUE_ERROR);
 
+  public static final DiagnosticGroup CONSTANT_PROPERTY =
+      DiagnosticGroups.registerGroup("constantProperty",
+          CheckAccessControls.CONST_PROPERTY_DELETED,
+          CheckAccessControls.CONST_PROPERTY_REASSIGNED_VALUE);
+
   public static final DiagnosticGroup TYPE_INVALIDATION =
       DiagnosticGroups.registerGroup("typeInvalidation",
           DisambiguateProperties.Warnings.INVALIDATION,
@@ -214,8 +235,14 @@ public class DiagnosticGroups {
 
   public static final DiagnosticGroup DUPLICATE_VARS =
       DiagnosticGroups.registerGroup("duplicate",
-          SyntacticScopeCreator.VAR_MULTIPLY_DECLARED_ERROR,
-          TypeValidator.DUP_VAR_DECLARATION);
+          VarCheck.VAR_MULTIPLY_DECLARED_ERROR,
+          TypeValidator.DUP_VAR_DECLARATION,
+          VariableReferenceCheck.REDECLARED_VARIABLE);
+
+  public static final DiagnosticGroup ES3 =
+      DiagnosticGroups.registerGroup("es3",
+          RhinoErrorReporter.INVALID_ES3_PROP_NAME,
+          RhinoErrorReporter.TRAILING_COMMA);
 
   public static final DiagnosticGroup ES5_STRICT =
       DiagnosticGroups.registerGroup("es5Strict",
@@ -229,9 +256,19 @@ public class DiagnosticGroups {
           StrictModeCheck.DUPLICATE_OBJECT_KEY,
           StrictModeCheck.BAD_FUNCTION_DECLARATION);
 
+  // TODO(johnlenz): Remove this in favor or "missingProvide" which matches
+  // the existing and more popular linter suppression
   public static final DiagnosticGroup CHECK_PROVIDES =
       DiagnosticGroups.registerGroup("checkProvides",
           CheckProvides.MISSING_PROVIDE_WARNING);
+
+  public static final DiagnosticGroup MISSING_PROVIDE =
+      DiagnosticGroups.registerGroup("missingProvide",
+          CheckProvides.MISSING_PROVIDE_WARNING);
+
+  public static final DiagnosticGroup MISSING_REQUIRE =
+      DiagnosticGroups.registerGroup("missingRequire",
+          CheckRequiresForConstructors.MISSING_REQUIRE_WARNING);
 
   public static final DiagnosticGroup DUPLICATE_MESSAGE =
       DiagnosticGroups.registerGroup("duplicateMessage",
@@ -244,13 +281,18 @@ public class DiagnosticGroups {
   public static final DiagnosticGroup SUSPICIOUS_CODE =
       DiagnosticGroups.registerGroup("suspiciousCode",
           CheckSuspiciousCode.SUSPICIOUS_SEMICOLON,
-          CheckSuspiciousCode.SUSPICIOUS_COMPARISON_WITH_NAN);
+          CheckSuspiciousCode.SUSPICIOUS_COMPARISON_WITH_NAN,
+          CheckSuspiciousCode.SUSPICIOUS_IN_OPERATOR);
 
   /**
    * Adds warning levels by name.
    */
   void setWarningLevel(CompilerOptions options,
       String name, CheckLevel level) {
+    if (name == "unnecessaryCasts") {
+      System.err.println(level);
+      (new RuntimeException()).printStackTrace();
+    }
     DiagnosticGroup group = forName(name);
     Preconditions.checkNotNull(group, "No warning class for name: %s", name);
     options.setWarningLevel(group, level);

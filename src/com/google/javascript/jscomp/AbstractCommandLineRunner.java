@@ -23,7 +23,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.base.Supplier;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -97,10 +96,13 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
   static final DiagnosticType OUTPUT_SAME_AS_INPUT_ERROR = DiagnosticType.error(
       "JSC_OUTPUT_SAME_AS_INPUT_ERROR",
       "Bad output file (already listed as input file): {0}");
+  static final DiagnosticType NO_TREE_GENERATED_ERROR = DiagnosticType.error(
+      "JSC_NO_TREE_GENERATED_ERROR",
+      "Code contains errors. No tree was generated.");
 
   private final CommandLineConfig config;
 
-  private Appendable jsOutput;
+  private final PrintStream defaultJsOutput;
   private final PrintStream err;
   private A compiler;
 
@@ -125,13 +127,8 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
 
   private Map<String, String> parsedModuleWrappers = null;
 
-  // Bookkeeping to measure optimal phase orderings.
-  private static final int NUM_RUNS_TO_DETERMINE_OPTIMAL_ORDER = 100;
-
   private static final String OUTPUT_MARKER = "%output%";
   private static final String OUTPUT_MARKER_JS_STRING = "%output|jsstring%";
-
-  private final RunTimeStats runTimeStats = new RunTimeStats();
 
   AbstractCommandLineRunner() {
     this(System.out, System.err);
@@ -139,7 +136,7 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
 
   AbstractCommandLineRunner(PrintStream out, PrintStream err) {
     this.config = new CommandLineConfig();
-    this.jsOutput = Preconditions.checkNotNull(out);
+    this.defaultJsOutput = Preconditions.checkNotNull(out);
     this.err = Preconditions.checkNotNull(err);
   }
 
@@ -231,8 +228,7 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
         .setDependencySorting(true)
         .setMoocherDropping(false)
         .setEntryPoints(closureEntryPoints);
-    }
-    else if (manageClosureDependencies ||
+    } else if (manageClosureDependencies ||
         closureEntryPoints.size() > 0) {
       return new DependencyOptions()
           .setDependencyPruning(true)
@@ -357,9 +353,10 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
     options.processCommonJSModules = config.processCommonJSModules;
     options.commonJSModulePathPrefix = config.commonJSModulePathPrefix;
     options.angularPass = config.angularPass;
+    options.tracer = config.tracerMode;
   }
 
-  final protected A getCompiler() {
+  protected final A getCompiler() {
     return compiler;
   }
 
@@ -367,18 +364,12 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
    * Runs the Compiler and calls System.exit() with the exit status of the
    * compiler.
    */
-  final public void run() {
+  public final void run() {
     int result = 0;
     int runs = 1;
-    if (config.computePhaseOrdering) {
-      runs = NUM_RUNS_TO_DETERMINE_OPTIMAL_ORDER;
-      PhaseOptimizer.randomizeLoops();
-    }
     try {
       for (int i = 0; i < runs && result == 0; i++) {
-        runTimeStats.recordStartRun();
         result = doRun();
-        runTimeStats.recordEndRun();
       }
     } catch (AbstractCommandLineRunner.FlagUsageException e) {
       System.err.println(e.getMessage());
@@ -386,18 +377,6 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
     } catch (Throwable t) {
       t.printStackTrace();
       result = -2;
-    }
-
-    if (config.computePhaseOrdering) {
-      runTimeStats.outputBestPhaseOrdering();
-    }
-
-    try {
-      if (jsOutput instanceof Closeable) {
-        ((Closeable) jsOutput).close();
-      }
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
     }
 
     if (testMode) {
@@ -728,6 +707,24 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
     }
   }
 
+  private Appendable createDefaultOutput() throws IOException {
+    boolean writeOutputToFile = !config.jsOutputFile.isEmpty();
+    if (writeOutputToFile) {
+      return fileNameToLegacyOutputWriter(config.jsOutputFile);
+    } else {
+      return streamToLegacyOutputWriter(defaultJsOutput);
+    }
+  }
+
+  private static void closeAppendable(Appendable output) throws IOException {
+    if (output instanceof Flushable) {
+      ((Flushable) output).flush();
+    }
+    if (output instanceof Closeable) {
+      ((Closeable) output).close();
+    }
+  }
+
   /**
    * Parses command-line arguments and runs the compiler.
    *
@@ -750,9 +747,6 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
     List<String> outputFileNames = Lists.newArrayList();
     if (writeOutputToFile) {
       outputFileNames.add(config.jsOutputFile);
-      jsOutput = fileNameToLegacyOutputWriter(config.jsOutputFile);
-    } else if (jsOutput instanceof OutputStream) {
-      jsOutput = streamToLegacyOutputWriter((OutputStream) jsOutput);
     }
 
     List<String> jsFiles = config.js;
@@ -801,14 +795,7 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
       }
     }
 
-    int errCode = processResults(result, modules, options);
-    // Flush the output if we are writing to a file.
-    // We can't close yet, because we may need to write phase ordering
-    // info to it later.
-    if (jsOutput instanceof Flushable) {
-      ((Flushable) jsOutput).flush();
-    }
-    return errCode;
+    return processResults(result, modules, options);
   }
 
   /**
@@ -816,17 +803,15 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
    */
   int processResults(Result result, List<JSModule> modules, B options)
        throws FlagUsageException, IOException {
-    if (config.computePhaseOrdering) {
-      return 0;
-    }
-
     if (config.printPassGraph) {
       if (compiler.getRoot() == null) {
         return 1;
       } else {
+        Appendable jsOutput = createDefaultOutput();
         jsOutput.append(
             DotFormatter.toDot(compiler.getPassConfig().getPassGraph()));
         jsOutput.append('\n');
+        closeAppendable(jsOutput);
         return 0;
       }
     }
@@ -835,21 +820,25 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
       if (compiler.getRoot() == null) {
         return 1;
       } else {
+        Appendable jsOutput = createDefaultOutput();
         ControlFlowGraph<Node> cfg = compiler.computeCFG();
         DotFormatter.appendDot(
             compiler.getRoot().getLastChild(), cfg, jsOutput);
         jsOutput.append('\n');
+        closeAppendable(jsOutput);
         return 0;
       }
     }
 
     if (config.printTree) {
       if (compiler.getRoot() == null) {
-        jsOutput.append("Code contains errors; no tree was generated.\n");
+        compiler.report(JSError.make(NO_TREE_GENERATED_ERROR));
         return 1;
       } else {
+        Appendable jsOutput = createDefaultOutput();
         compiler.getRoot().appendStringTree(jsOutput);
         jsOutput.append("\n");
+        closeAppendable(jsOutput);
         return 0;
       }
     }
@@ -906,9 +895,11 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
       escaper = getJavascriptEscaper();
     }
 
+    Appendable jsOutput = createDefaultOutput();
     writeOutput(
         jsOutput, compiler, compiler.toSource(), config.outputWrapper,
         marker, escaper);
+    closeAppendable(jsOutput);
   }
 
   private void outputModuleBinaryAndSourceMaps(
@@ -1418,7 +1409,7 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
    */
   private void outputModuleGraphJson() throws IOException {
     if (config.outputModuleDependencies != null &&
-        config.outputModuleDependencies != "") {
+        config.outputModuleDependencies.length() != 0) {
       Writer out = fileNameToOutputWriter2(config.outputModuleDependencies);
       printModuleGraphJsonTo(out);
       out.close();
@@ -1532,53 +1523,6 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
     return rootRelativePathsMap;
   }
 
-  private class RunTimeStats {
-    private long bestRunTime = Long.MAX_VALUE;
-    private long worstRunTime = Long.MIN_VALUE;
-    private long lastStartTime = 0;
-    private List<List<String>> loopedPassesInBestRun = null;
-
-    /**
-     * Record the start of a run.
-     */
-    private void recordStartRun() {
-      lastStartTime = System.currentTimeMillis();
-      PhaseOptimizer.clearLoopsRun();
-    }
-
-    /**
-     * Record the end of a run.
-     */
-    private void recordEndRun() {
-      long endTime = System.currentTimeMillis();
-      long length = endTime - lastStartTime;
-      worstRunTime = Math.max(length, worstRunTime);
-      if (length < bestRunTime) {
-        loopedPassesInBestRun = PhaseOptimizer.getLoopsRun();
-        bestRunTime = length;
-      }
-    }
-
-    /**
-     * Print the best phase loop to stderr.
-     */
-    private void outputBestPhaseOrdering() {
-      try {
-        jsOutput.append("Best time: " + bestRunTime + "\n");
-        jsOutput.append("Worst time: " + worstRunTime + "\n");
-
-        int i = 1;
-        for (List<String> loop : loopedPassesInBestRun) {
-          jsOutput.append(
-              "\nLoop " + i + ":\n" + Joiner.on("\n").join(loop)+ "\n");
-          i++;
-        }
-      } catch (IOException e) {
-        throw new RuntimeException("unexpected exception", e);
-      }
-    }
-  }
-
   /**
    * Configurations for the command line configs. Designed for easy
    * building, so that we can decouple the flags-parsing library from
@@ -1593,17 +1537,6 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
     /** Prints out the parse tree and exits */
     CommandLineConfig setPrintTree(boolean printTree) {
       this.printTree = printTree;
-      return this;
-    }
-
-    private boolean computePhaseOrdering = false;
-
-    /**
-     * Runs the compile job many times, then prints out the best phase
-     * ordering from this run
-     */
-    CommandLineConfig setComputePhaseOrdering(boolean computePhaseOrdering) {
-      this.computePhaseOrdering = computePhaseOrdering;
       return this;
     }
 
@@ -2074,6 +2007,14 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
      */
     CommandLineConfig setAngularPass(boolean angularPass) {
       this.angularPass = angularPass;
+      return this;
+    }
+
+    private CompilerOptions.TracerMode tracerMode =
+        CompilerOptions.TracerMode.OFF;
+
+    CommandLineConfig setTracerMode(CompilerOptions.TracerMode tracerMode) {
+      this.tracerMode = tracerMode;
       return this;
     }
   }

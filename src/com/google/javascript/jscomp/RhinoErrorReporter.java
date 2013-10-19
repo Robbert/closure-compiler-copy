@@ -17,9 +17,8 @@
 package com.google.javascript.jscomp;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.javascript.jscomp.CheckLevel;
 import com.google.javascript.rhino.ErrorReporter;
-import com.google.javascript.rhino.ScriptRuntime;
+import com.google.javascript.rhino.SimpleErrorReporter;
 
 import java.util.Map;
 import java.util.Map.Entry;
@@ -57,6 +56,13 @@ class RhinoErrorReporter {
           "Type annotations are not allowed here. " +
           "Are you missing parentheses?");
 
+  static final DiagnosticType INVALID_ES3_PROP_NAME = DiagnosticType.warning(
+      "JSC_INVALID_ES3_PROP_NAME",
+      "Keywords and reserved words are not allowed as unquoted property " +
+      "names in older versions of JavaScript. " +
+      "If you are targeting newer versions of JavaScript, " +
+      "set the appropriate language_in option.");
+
   static final DiagnosticType PARSE_TREE_TOO_DEEP =
       DiagnosticType.error("PARSE_TREE_TOO_DEEP",
           "Parse tree too deep.");
@@ -78,7 +84,7 @@ class RhinoErrorReporter {
 
   private RhinoErrorReporter(AbstractCompiler compiler) {
     this.compiler = compiler;
-    typeMap = ImmutableMap.<Pattern,DiagnosticType>builder()
+    typeMap = ImmutableMap.<Pattern, DiagnosticType>builder()
         // Trailing comma
         .put(replacePlaceHolders(
             com.google.javascript.rhino.head.ScriptRuntime.getMessage0(
@@ -92,11 +98,18 @@ class RhinoErrorReporter {
             DUPLICATE_PARAM)
 
         // Unknown @annotations.
-        .put(replacePlaceHolders(ScriptRuntime.getMessage0("msg.bad.jsdoc.tag")),
+        .put(replacePlaceHolders(
+            SimpleErrorReporter.getMessage0("msg.bad.jsdoc.tag")),
             BAD_JSDOC_ANNOTATION)
 
+        // Unexpected @type annotations
         .put(Pattern.compile("^Type annotations are not allowed here.*"),
             MISPLACED_TYPE_ANNOTATION)
+
+        // Unexpected @type annotations
+        .put(Pattern.compile("^Keywords and reserved words" +
+            " are not allowed as unquoted property.*"),
+            INVALID_ES3_PROP_NAME)
 
         // Type annotation errors.
         .put(Pattern.compile("^Bad type annotation.*"),

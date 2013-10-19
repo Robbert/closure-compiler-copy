@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Closure Compiler Authors
+ * Copyright 2008 The Closure Compiler Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -435,16 +435,13 @@ function Array(var_args) {}
 
 // Functions:
 
-// TODO(nicksantos): Change @this {Object} to @this { {length: number} }
-
-
 /**
  * Returns a new array comprised of this array joined with other array(s)
  * and/or value(s).
  *
  * @param {...*} var_args
  * @return {!Array}
- * @this {Object}
+ * @this {*}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/concat
  */
@@ -457,7 +454,7 @@ Array.prototype.concat = function(var_args) {};
  *     array. The separator is converted to a string if necessary. If omitted,
  *     the array elements are separated with a comma.
  * @return {string}
- * @this {Object}
+ * @this {{length: number}|string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/join
  */
@@ -491,7 +488,7 @@ Array.prototype.push = function(var_args) {};
  * Transposes the elements of an array in place: the first array element becomes the
  * last and the last becomes the first.
  *
- * @this {Object}
+ * @this {{length: number}}
  * @modifies {this}
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/reverse
  */
@@ -517,7 +514,7 @@ Array.prototype.shift = function() {};
  * @param {*=} opt_end Zero-based index at which to end extraction.  slice
  *     extracts up to but not including end.
  * @return {!Array.<T>}
- * @this {{length: number}|Array.<T>}
+ * @this {{length: number}|Array.<T>|string}
  * @template T
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/slice
@@ -527,7 +524,7 @@ Array.prototype.slice = function(opt_begin, opt_end) {};
 /**
  * Sorts the elements of an array in place.
  *
- * @param {function(T,T):number=} opt_compareFunction Specifies a function that 
+ * @param {function(T,T):number=} opt_compareFunction Specifies a function that
  *     defines the sort order.
  * @this {{length: number}|Array.<T>}
  * @template T
@@ -575,7 +572,7 @@ Array.prototype.toString = function() {};
  *
  * @param {...*} var_args
  * @return {number} The new length of the array
- * @this {Object}
+ * @this {{length: number}}
  * @modifies {this}
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/unshift
  */
@@ -588,7 +585,7 @@ Array.prototype.unshift = function(var_args) {};
  * @param {?function(?, T, number, !Array.<T>) : R} callback
  * @param {*=} opt_initialValue
  * @return {R}
- * @this {{length: number}|Array.<T>}
+ * @this {{length: number}|Array.<T>|string}
  * @template T,R
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/reduce
  */
@@ -601,7 +598,7 @@ Array.prototype.reduce = function(callback, opt_initialValue) {};
  * @param {?function(?, T, number, !Array.<T>) : R} callback
  * @param {*=} opt_initialValue
  * @return {R}
- * @this {{length: number}|Array.<T>}
+ * @this {{length: number}|Array.<T>|string}
  * @template T,R
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/reduceRight
  */
@@ -612,7 +609,7 @@ Array.prototype.reduceRight = function(callback, opt_initialValue) {};
  * @param {?function(this:S, T, number, !Array.<T>): ?} callback
  * @param {S=} opt_thisobj
  * @return {boolean}
- * @this {{length: number}|Array.<T>}
+ * @this {{length: number}|Array.<T>|string}
  * @template T,S
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/every
  */
@@ -623,7 +620,7 @@ Array.prototype.every = function(callback, opt_thisobj) {};
  * @param {?function(this:S, T, number, !Array.<T>): ?} callback
  * @param {S=} opt_thisobj
  * @return {!Array.<T>}
- * @this {{length: number}|Array.<T>}
+ * @this {{length: number}|Array.<T>|string}
  * @template T,S
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/filter
  */
@@ -633,7 +630,7 @@ Array.prototype.filter = function(callback, opt_thisobj) {};
  * Available in ECMAScript 5, Mozilla 1.6+.
  * @param {?function(this:S, T, number, !Array.<T>): ?} callback
  * @param {S=} opt_thisobj
- * @this {{length: number}|Array.<T>}
+ * @this {{length: number}|Array.<T>|string}
  * @template T,S
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/forEach
  */
@@ -644,7 +641,7 @@ Array.prototype.forEach = function(callback, opt_thisobj) {};
  * @param {T} obj
  * @param {number=} opt_fromIndex
  * @return {number}
- * @this {{length: number}|Array.<T>}
+ * @this {{length: number}|Array.<T>|string}
  * @nosideeffects
  * @template T
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/indexOf
@@ -656,7 +653,7 @@ Array.prototype.indexOf = function(obj, opt_fromIndex) {};
  * @param {T} obj
  * @param {number=} opt_fromIndex
  * @return {number}
- * @this {{length: number}|Array.<T>}
+ * @this {{length: number}|Array.<T>|string}
  * @nosideeffects
  * @template T
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/lastIndexOf
@@ -668,7 +665,7 @@ Array.prototype.lastIndexOf = function(obj, opt_fromIndex) {};
  * @param {?function(this:S, T, number, !Array.<T>): R} callback
  * @param {S=} opt_thisobj
  * @return {!Array.<R>}
- * @this {{length: number}|Array.<T>}
+ * @this {{length: number}|Array.<T>|string}
  * @template T,S,R
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/map
  */
@@ -679,7 +676,7 @@ Array.prototype.map = function(callback, opt_thisobj) {};
  * @param {?function(this:S, T, number, !Array.<T>): ?} callback
  * @param {S=} opt_thisobj
  * @return {boolean}
- * @this {{length: number}|Array.<T>}
+ * @this {{length: number}|Array.<T>|string}
  * @template T,S
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Array/some
  */
@@ -832,6 +829,7 @@ Boolean.prototype.toString = function() {};
 function Number(opt_value) {}
 
 /**
+ * @this {Number|number}
  * @param {number=} opt_fractionDigits
  * @return {string}
  * @nosideeffects
@@ -840,6 +838,7 @@ function Number(opt_value) {}
 Number.prototype.toExponential = function(opt_fractionDigits) {};
 
 /**
+ * @this {Number|number}
  * @param {*=} opt_digits
  * @return {string}
  * @nosideeffects
@@ -848,6 +847,7 @@ Number.prototype.toExponential = function(opt_fractionDigits) {};
 Number.prototype.toFixed = function(opt_digits) {};
 
 /**
+ * @this {Number|number}
  * @param {number=} opt_precision
  * @return {string}
  * @nosideeffects
@@ -857,6 +857,7 @@ Number.prototype.toPrecision = function(opt_precision) {};
 
 /**
  * Returns a string representing the number.
+ * @this {Number|number}
  * @param {(number|Number)=} opt_radix An optional radix.
  * @return {string}
  * @nosideeffects
@@ -1495,11 +1496,13 @@ Date.prototype.toTimeString = function() {};
 Date.prototype.toUTCString = function() {};
 
 /**
+ * @param {(string|Array.<string>)=} opt_locales
+ * @param {Object=} opt_options
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Date/toLocaleDateString
  */
-Date.prototype.toLocaleDateString = function() {};
+Date.prototype.toLocaleDateString = function(opt_locales, opt_options) {};
 
 /**
  * @param {string} formatString
@@ -1510,19 +1513,24 @@ Date.prototype.toLocaleDateString = function() {};
 Date.prototype.toLocaleFormat = function(formatString) {};
 
 /**
+ * @param {string|Array.<string>=} opt_locales
+ * @param {Object=} opt_options
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Date/toLocaleString
+ * @see http://www.ecma-international.org/ecma-402/1.0/#sec-13.3.1
  * @override
  */
-Date.prototype.toLocaleString = function() {};
+Date.prototype.toLocaleString = function(opt_locales, opt_options) {};
 
 /**
+ * @param {(string|Array.<string>)=} opt_locales
+ * @param {Object=} opt_options
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Date/toLocaleTimeString
  */
-Date.prototype.toLocaleTimeString = function() {};
+Date.prototype.toLocaleTimeString = function(opt_locales, opt_options) {};
 
 /**
  * @this {Date}
@@ -1558,6 +1566,7 @@ function String(opt_str) {}
 String.fromCharCode = function(var_args) {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/anchor
@@ -1565,6 +1574,7 @@ String.fromCharCode = function(var_args) {};
 String.prototype.anchor = function() {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/big
@@ -1572,6 +1582,7 @@ String.prototype.anchor = function() {};
 String.prototype.big = function() {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/blink
@@ -1579,6 +1590,7 @@ String.prototype.big = function() {};
 String.prototype.blink = function() {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/bold
@@ -1588,6 +1600,7 @@ String.prototype.bold = function() {};
 /**
  * Returns the specified character from a string.
  *
+ * @this {String|string}
  * @param {number} index
  * @return {string}
  * @nosideeffects
@@ -1599,6 +1612,7 @@ String.prototype.charAt = function(index) {};
  * Returns a number indicating the Unicode value of the character at the given
  * index.
  *
+ * @this {String|string}
  * @param {number=} opt_index
  * @return {number}
  * @nosideeffects
@@ -1609,6 +1623,7 @@ String.prototype.charCodeAt = function(opt_index) {};
 /**
  * Combines the text of two or more strings and returns a new string.
  *
+ * @this {String|string}
  * @param {...*} var_args
  * @return {string}
  * @nosideeffects
@@ -1617,6 +1632,7 @@ String.prototype.charCodeAt = function(opt_index) {};
 String.prototype.concat = function(var_args) {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/fixed
@@ -1624,6 +1640,7 @@ String.prototype.concat = function(var_args) {};
 String.prototype.fixed = function() {};
 
 /**
+ * @this {String|string}
  * @param {string} color
  * @return {string}
  * @nosideeffects
@@ -1632,6 +1649,7 @@ String.prototype.fixed = function() {};
 String.prototype.fontcolor = function(color) {};
 
 /**
+ * @this {String|string}
  * @param {number} size
  * @return {string}
  * @nosideeffects
@@ -1644,6 +1662,7 @@ String.prototype.fontsize = function(size) {};
  * of the specified value, starting the search at fromIndex, returns -1 if the
  * value is not found.
  *
+ * @this {String|string}
  * @param {string|null} searchValue
  * @param {(number|null)=} opt_fromIndex
  * @return {number}
@@ -1653,6 +1672,7 @@ String.prototype.fontsize = function(size) {};
 String.prototype.indexOf = function(searchValue, opt_fromIndex) {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/italics
@@ -1664,6 +1684,7 @@ String.prototype.italics = function() {};
  * the specified value, or -1 if not found. The calling string is searched
  * backward, starting at fromIndex.
  *
+ * @this {String|string}
  * @param {string|null} searchValue
  * @param {(number|null)=} opt_fromIndex
  * @return {number}
@@ -1673,6 +1694,7 @@ String.prototype.italics = function() {};
 String.prototype.lastIndexOf = function(searchValue, opt_fromIndex) {};
 
 /**
+ * @this {String|string}
  * @param {string} hrefAttribute
  * @return {string}
  * @nosideeffects
@@ -1696,6 +1718,7 @@ String.prototype.localeCompare = function(other) {};
  * Used to retrieve the matches when matching a string against a regular
  * expression.
  *
+ * @this {String|string}
  * @param {*} regexp
  * @return {?Array.<string>} This should really return an Array with a few
  *     special properties, but we do not have a good way to model this in
@@ -1705,6 +1728,7 @@ String.prototype.localeCompare = function(other) {};
 String.prototype.match = function(regexp) {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/quote
@@ -1717,6 +1741,7 @@ String.prototype.quote = function() {};
  *
  * This may have side-effects if the replacement function has side-effects.
  *
+ * @this {String|string}
  * @param {RegExp|string} regex
  * @param {string|Function} str
  * @param {string=} opt_flags
@@ -1729,6 +1754,7 @@ String.prototype.replace = function(regex, str, opt_flags) {};
  * Executes the search for a match between a regular expression and this String
  * object.
  *
+ * @this {String|string}
  * @param {RegExp|string} regexp
  * @return {number}
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/search
@@ -1736,6 +1762,7 @@ String.prototype.replace = function(regex, str, opt_flags) {};
 String.prototype.search = function(regexp) {};
 
 /**
+ * @this {String|string}
  * @param {number} begin
  * @param {number=} opt_end
  * @return {string}
@@ -1745,6 +1772,7 @@ String.prototype.search = function(regexp) {};
 String.prototype.slice = function(begin, opt_end) {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/small
@@ -1752,6 +1780,7 @@ String.prototype.slice = function(begin, opt_end) {};
 String.prototype.small = function() {};
 
 /**
+ * @this {String|string}
  * @param {*=} opt_separator
  * @param {number=} opt_limit
  * @return {!Array.<string>}
@@ -1768,6 +1797,7 @@ String.prototype.split = function(opt_separator, opt_limit) {};
 String.prototype.strike = function() {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/sub
@@ -1775,6 +1805,7 @@ String.prototype.strike = function() {};
 String.prototype.sub = function() {};
 
 /**
+ * @this {String|string}
  * @param {number} start
  * @param {number=} opt_length
  * @return {string} The specified substring.
@@ -1784,6 +1815,7 @@ String.prototype.sub = function() {};
 String.prototype.substr = function(start, opt_length) {};
 
 /**
+ * @this {String|string}
  * @param {number} start
  * @param {number=} opt_end
  * @return {string} The specified substring.
@@ -1793,6 +1825,7 @@ String.prototype.substr = function(start, opt_length) {};
 String.prototype.substring = function(start, opt_end) {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/sup
@@ -1800,6 +1833,7 @@ String.prototype.substring = function(start, opt_end) {};
 String.prototype.sup = function() {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/toLocaleUpperCase
@@ -1807,6 +1841,7 @@ String.prototype.sup = function() {};
 String.prototype.toLocaleUpperCase = function() {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/toLocaleLowerCase
@@ -1814,6 +1849,7 @@ String.prototype.toLocaleUpperCase = function() {};
 String.prototype.toLocaleLowerCase = function() {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/toLowerCase
@@ -1821,6 +1857,7 @@ String.prototype.toLocaleLowerCase = function() {};
 String.prototype.toLowerCase = function() {};
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/String/toUpperCase

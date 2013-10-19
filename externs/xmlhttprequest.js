@@ -33,7 +33,7 @@
  * server.
  *
  * @constructor
- * @extends {XMLHttpRequestEventTarget}
+ * @implements {EventTarget}
  * @see http://www.w3.org/TR/XMLHttpRequest/#xmlhttprequest-object
  */
 function XMLHttpRequest() {}
@@ -56,7 +56,7 @@ XMLHttpRequest.prototype.dispatchEvent = function(evt) {};
  * @param {?string=} opt_user
  * @param {?string=} opt_password
  * @return {undefined}
- * @see http://www.w3.org/TR/XMLHttpRequest/#open
+ * @see http://www.w3.org/TR/XMLHttpRequest/#the-open()-method
  */
 XMLHttpRequest.prototype.open = function(method, url, opt_async, opt_user,
     opt_password) {};
@@ -65,46 +65,45 @@ XMLHttpRequest.prototype.open = function(method, url, opt_async, opt_user,
  * @param {string} header
  * @param {string} value
  * @return {undefined}
- * @see http://www.w3.org/TR/XMLHttpRequest/#setrequestheader
+ * @see http://www.w3.org/TR/XMLHttpRequest/#the-setrequestheader()-method
  */
 XMLHttpRequest.prototype.setRequestHeader = function(header, value) {};
 
 /**
- * @param {ArrayBuffer|Blob|Document|FormData|string=} opt_data
+ * @param {ArrayBuffer|ArrayBufferView|Blob|Document|FormData|string=} opt_data
  * @return {undefined}
- * @see http://www.w3.org/TR/XMLHttpRequest/#send
- * @see http://dev.w3.org/2006/webapi/XMLHttpRequest-2/#the-send-method
+ * @see http://www.w3.org/TR/XMLHttpRequest/#the-send()-method
  */
 XMLHttpRequest.prototype.send = function(opt_data) {};
 
 /**
  * @return {undefined}
- * @see http://www.w3.org/TR/XMLHttpRequest/#abort
+ * @see http://www.w3.org/TR/XMLHttpRequest/#the-abort()-method
  */
 XMLHttpRequest.prototype.abort = function() {};
 
 /**
  * @return {string}
- * @see http://www.w3.org/TR/XMLHttpRequest/#getallresponseheaders
+ * @see http://www.w3.org/TR/XMLHttpRequest/#the-getallresponseheaders()-method
  */
 XMLHttpRequest.prototype.getAllResponseHeaders = function() {};
 
 /**
  * @param {string} header
  * @return {string}
- * @see http://www.w3.org/TR/XMLHttpRequest/#getresponseheader
+ * @see http://www.w3.org/TR/XMLHttpRequest/#the-getresponseheader()-method
  */
 XMLHttpRequest.prototype.getResponseHeader = function(header) {};
 
 /**
  * @type {?string}
- * @see http://www.w3.org/TR/XMLHttpRequest/#responsetext
+ * @see http://www.w3.org/TR/XMLHttpRequest/#the-responsetext-attribute
  */
 XMLHttpRequest.prototype.responseText;
 
 /**
  * @type {boolean}
- * @see http://dev.w3.org/2006/webapi/XMLHttpRequest-2/#withcredentials
+ * @see http://www.w3.org/TR/XMLHttpRequest/#the-withcredentials-attribute
  */
 XMLHttpRequest.prototype.withCredentials;
 
@@ -131,7 +130,6 @@ XMLHttpRequest.prototype.responseType;
  */
 XMLHttpRequest.prototype.response;
 
-
 /**
  * @type {ArrayBuffer}
  * Implemented as a draft spec in Firefox 4 as the way to get a requested array
@@ -141,8 +139,8 @@ XMLHttpRequest.prototype.response;
 XMLHttpRequest.prototype.mozResponseArrayBuffer;
 
 /**
- * @type {?Document}
- * @see http://www.w3.org/TR/XMLHttpRequest/#responsexml
+ * @type {Document}
+ * @see http://www.w3.org/TR/XMLHttpRequest/#the-responsexml-attribute
  */
 XMLHttpRequest.prototype.responseXML;
 
@@ -154,19 +152,19 @@ XMLHttpRequest.prototype.readyState;
 
 /**
  * @type {number}
- * @see http://www.w3.org/TR/XMLHttpRequest/#status
+ * @see http://www.w3.org/TR/XMLHttpRequest/#the-status-attribute
  */
 XMLHttpRequest.prototype.status;
 
 /**
  * @type {string}
- * @see http://www.w3.org/TR/XMLHttpRequest/#statustext
+ * @see http://www.w3.org/TR/XMLHttpRequest/#the-statustext-attribute
  */
 XMLHttpRequest.prototype.statusText;
 
 /**
  * @type {Function}
- * @see http://www.w3.org/TR/XMLHttpRequest/#onreadystatechange
+ * @see http://www.w3.org/TR/XMLHttpRequest/#handler-xhr-onreadystatechange
  */
 XMLHttpRequest.prototype.onreadystatechange;
 

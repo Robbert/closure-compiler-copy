@@ -18,9 +18,8 @@ package com.google.javascript.jscomp;
 
 import com.google.common.base.Preconditions;
 import com.google.javascript.jscomp.ControlFlowGraph.Branch;
-import com.google.javascript.jscomp.NodeTraversal.AbstractPostOrderCallback;
 import com.google.javascript.jscomp.NodeTraversal.AbstractShallowCallback;
-import com.google.javascript.jscomp.NodeTraversal.ScopedCallback;
+import com.google.javascript.jscomp.NodeTraversal.FunctionCallback;
 import com.google.javascript.jscomp.graph.DiGraph.DiGraphEdge;
 import com.google.javascript.jscomp.graph.DiGraph.DiGraphNode;
 import com.google.javascript.jscomp.graph.GraphReachability;
@@ -49,11 +48,9 @@ import java.util.logging.Logger;
 // These things don't require reachability info, consider making them their own
 // pass or putting them in some other, more related pass.
 
-class UnreachableCodeElimination extends AbstractPostOrderCallback
-    implements CompilerPass, ScopedCallback  {
+class UnreachableCodeElimination implements CompilerPass {
   private static final Logger logger =
     Logger.getLogger(UnreachableCodeElimination.class.getName());
-
   private final AbstractCompiler compiler;
   private final boolean removeNoOpStatements;
   private boolean codeChanged;
@@ -65,31 +62,26 @@ class UnreachableCodeElimination extends AbstractPostOrderCallback
   }
 
   @Override
-  public void exitScope(NodeTraversal t) {
-    Scope scope = t.getScope();
-    Node root = scope.getRootNode();
-
-    // Computes the control flow graph.
-    ControlFlowAnalysis cfa = new ControlFlowAnalysis(compiler, false, false);
-    cfa.process(null, root);
-    ControlFlowGraph<Node> cfg = cfa.getCfg();
-
-    new GraphReachability<Node, ControlFlowGraph.Branch>(cfg)
-        .compute(cfg.getEntry().getValue());
-
-    if (scope.isLocal()) {
-      root = root.getLastChild();
-    }
-
-    do {
-      codeChanged = false;
-      NodeTraversal.traverse(compiler, root, new EliminationPass(cfg));
-    } while (codeChanged);
-  }
-
-  @Override
-  public void process(Node externs, Node root) {
-    NodeTraversal.traverse(compiler, root, this);
+  public void process(Node externs, Node toplevel) {
+    NodeTraversal.traverseChangedFunctions(compiler, new FunctionCallback() {
+        @Override
+        public void visit(AbstractCompiler compiler, Node root) {
+          // Computes the control flow graph.
+          ControlFlowAnalysis cfa =
+              new ControlFlowAnalysis(compiler, false, false);
+          cfa.process(null, root);
+          ControlFlowGraph<Node> cfg = cfa.getCfg();
+          new GraphReachability<Node, ControlFlowGraph.Branch>(cfg)
+              .compute(cfg.getEntry().getValue());
+          if (root.isFunction()) {
+            root = root.getLastChild();
+          }
+          do {
+            codeChanged = false;
+            NodeTraversal.traverse(compiler, root, new EliminationPass(cfg));
+          } while (codeChanged);
+        }
+      });
   }
 
   private class EliminationPass extends AbstractShallowCallback {
@@ -175,10 +167,20 @@ class UnreachableCodeElimination extends AbstractPostOrderCallback
                 outEdges.get(0).getValue() == Branch.UNCOND);
             Node fallThrough = computeFollowing(n);
             Node nextCfgNode = outEdges.get(0).getDestination().getValue();
-            if (nextCfgNode == fallThrough) {
+            if (nextCfgNode == fallThrough && !inFinally(n.getParent(), n)) {
               removeNode(n);
             }
           }
+      }
+    }
+
+    private boolean inFinally(Node parent, Node child) {
+      if (parent == null || parent.isFunction()) {
+        return false;
+      } else if (NodeUtil.isTryFinallyNode(parent, child)) {
+        return true;
+      } else {
+        return inFinally(parent.getParent(), parent);
       }
     }
 
@@ -247,17 +249,11 @@ class UnreachableCodeElimination extends AbstractPostOrderCallback
     private void removeNode(Node n) {
       codeChanged = true;
       NodeUtil.redeclareVarsInsideBranch(n);
-      compiler.reportCodeChange();
+      compiler.reportChangeToEnclosingScope(n);
       if (logger.isLoggable(Level.FINE)) {
         logger.fine("Removing " + n.toString());
       }
       NodeUtil.removeChild(n.getParent(), n);
     }
   }
-
-  @Override
-  public void visit(NodeTraversal t, Node n, Node parent) {}
-
-  @Override
-  public void enterScope(NodeTraversal t) {}
 }

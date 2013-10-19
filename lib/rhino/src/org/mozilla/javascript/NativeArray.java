@@ -365,7 +365,7 @@ public class NativeArray extends IdScriptableObject implements List
     }
 
     private static long toArrayIndex(double d) {
-        if (d == d) {
+        if (!Double.isNaN(d)) {
             long index = ScriptRuntime.toUint32(d);
             if (index == d && index != 4294967295L) {
                 return index;
@@ -1688,12 +1688,18 @@ public class NativeArray extends IdScriptableObject implements List
         return true;
     }
 
+    @Override
     public int size() {
         long longLen = length;
         if (longLen > Integer.MAX_VALUE) {
             throw new IllegalStateException();
         }
         return (int) longLen;
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return length == 0;
     }
 
     public Object get(long index) {

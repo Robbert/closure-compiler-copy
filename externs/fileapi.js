@@ -1,5 +1,5 @@
 /*
- * Copyright 2010 Closure Compiler Authors
+ * Copyright 2010 The Closure Compiler Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -925,3 +925,24 @@ StorageInfo.prototype.queryUsageAndQuota = function(type, successCallback,
  * @type {!StorageInfo}
  */
 Window.prototype.webkitStorageInfo;
+
+/**
+ * @see https://dvcs.w3.org/hg/quota/raw-file/tip/Overview.html#storagequota-interface.
+ * @constructor
+ */
+function StorageQuota() {}
+
+/**
+ * @param {number} size
+ * @param {function(number)=} opt_successCallback
+ * @param {function(!DOMException)=} opt_errorCallback
+ */
+StorageQuota.prototype.requestQuota = function(size, opt_successCallback,
+    opt_errorCallback) {};
+
+/**
+ * @param {function(number, number)} successCallback
+ * @param {function(!DOMException)=} opt_errorCallback
+ */
+StorageQuota.prototype.queryUsageAndQuota = function(successCallback,
+    opt_errorCallback) {};

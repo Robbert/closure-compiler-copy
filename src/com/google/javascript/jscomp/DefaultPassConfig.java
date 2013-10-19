@@ -25,6 +25,7 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import com.google.javascript.jscomp.AbstractCompiler.LifeCycleStage;
 import com.google.javascript.jscomp.CompilerOptions.LanguageMode;
+import com.google.javascript.jscomp.CoverageInstrumentationPass.CoverageReach;
 import com.google.javascript.jscomp.ExtractPrototypeMemberDeclarations.Pattern;
 import com.google.javascript.jscomp.NodeTraversal.Callback;
 import com.google.javascript.jscomp.parsing.ParserRunner;
@@ -36,6 +37,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,7 +66,12 @@ public class DefaultPassConfig extends PassConfig {
 
   static final DiagnosticType CANNOT_USE_PROTOTYPE_AND_VAR =
       DiagnosticType.error("JSC_CANNOT_USE_PROTOTYPE_AND_VAR",
-          "Rename prototypes and inline variables cannot be used together");
+          "Rename prototypes and inline variables cannot be used together.");
+
+  static final DiagnosticType CANNOT_USE_EXPORT_LOCALS_AND_EXTERN_PROP_REMOVAL =
+      DiagnosticType.error("JSC_CANNOT_USE_EXPORT_LOCALS_AND_EXTERN_PROP_REMOVAL",
+          "remove_unused_prototype_properties_in_externs " +
+          "and export_local_property_definitions cannot be used together.");
 
   // Miscellaneous errors.
   static final DiagnosticType REPORT_PATH_IO_ERROR =
@@ -101,6 +108,8 @@ public class DefaultPassConfig extends PassConfig {
   /** Names exported by goog.exportSymbol. */
   private Set<String> exportedNames = null;
 
+  /** Shared name generator that remembers character encoding bias */
+  private NameGenerator nameGenerator = null;
   /**
    * Ids for cross-module method stubbing, so that each method has
    * a unique id.
@@ -167,6 +176,13 @@ public class DefaultPassConfig extends PassConfig {
 
   PreprocessorSymbolTable getPreprocessorSymbolTable() {
     return preprocessorSymbolTable;
+  }
+
+  private NameGenerator getNameGenerator() {
+    if (nameGenerator == null) {
+      nameGenerator = new NameGenerator(new HashSet<String>(0), "", null);
+    }
+    return nameGenerator;
   }
 
   void maybeInitializePreprocessorSymbolTable(AbstractCompiler compiler) {
@@ -296,6 +312,11 @@ public class DefaultPassConfig extends PassConfig {
       checks.add(checkAccessControls);
     }
 
+    if (options.checkEventfulObjectDisposalPolicy !=
+        CheckEventfulObjectDisposal.DisposalCheckingPolicy.OFF) {
+      checks.add(checkEventfulObjectDisposal);
+    }
+
     if (options.checkGlobalNamesLevel.isOn()) {
       checks.add(checkGlobalNames);
     }
@@ -356,6 +377,10 @@ public class DefaultPassConfig extends PassConfig {
     // TODO(nicksantos): The order of these passes makes no sense, and needs
     // to be re-arranged.
 
+    if (options.instrumentForCoverage) {
+      passes.add(instrumentForCodeCoverage);
+    }
+
     if (options.runtimeTypeCheck) {
       passes.add(runtimeTypeCheck);
     }
@@ -376,6 +401,14 @@ public class DefaultPassConfig extends PassConfig {
     if (options.closurePass &&
         (options.removeAbstractMethods || options.removeClosureAsserts)) {
       passes.add(closureCodeRemoval);
+    }
+
+    // Property disambiguation should only run once and needs to be done
+    // soon after type checking, both so that it can make use of type
+    // information and so that other passes can take advantage of the renamed
+    // properties.
+    if (options.disambiguatePrivateProperties) {
+      passes.add(disambiguatePrivateProperties);
     }
 
     // Collapsing properties can undo constant inlining, so we do this before
@@ -630,6 +663,15 @@ public class DefaultPassConfig extends PassConfig {
       passes.add(instrumentFunctions);
     }
 
+    // Instrument calls to memory allocations
+    if (options.getInstrumentMemoryAllocations()) {
+      passes.add(instrumentMemoryAllocations);
+    }
+
+    if (options.aggressiveRenaming) {
+      passes.add(gatherCharBias);
+    }
+
     if (options.variableRenaming != VariableRenamingPolicy.ALL) {
       // If we're leaving some (or all) variables with their old names,
       // then we need to undo any of the markers we added for distinguishing
@@ -809,14 +851,14 @@ public class DefaultPassConfig extends PassConfig {
   };
 
   /** Verify that all the passes are one-time passes. */
-  private void assertAllOneTimePasses(List<PassFactory> passes) {
+  private static void assertAllOneTimePasses(List<PassFactory> passes) {
     for (PassFactory pass : passes) {
       Preconditions.checkState(pass.isOneTimePass());
     }
   }
 
   /** Verify that all the passes are multi-run passes. */
-  private void assertAllLoopablePasses(List<PassFactory> passes) {
+  private static void assertAllLoopablePasses(List<PassFactory> passes) {
     for (PassFactory pass : passes) {
       Preconditions.checkState(!pass.isOneTimePass());
     }
@@ -859,10 +901,17 @@ public class DefaultPassConfig extends PassConfig {
   final PassFactory generateExports = new PassFactory("generateExports", true) {
     @Override
     protected CompilerPass create(AbstractCompiler compiler) {
+      if (options.removeUnusedPrototypePropertiesInExterns
+          && options.exportLocalPropertyDefinitions) {
+        return new ErrorPass(
+            compiler, CANNOT_USE_EXPORT_LOCALS_AND_EXTERN_PROP_REMOVAL);
+      }
+
       CodingConvention convention = compiler.getCodingConvention();
       if (convention.getExportSymbolFunction() != null &&
           convention.getExportPropertyFunction() != null) {
         return new GenerateExports(compiler,
+            options.exportLocalPropertyDefinitions,
             convention.getExportSymbolFunction(),
             convention.getExportPropertyFunction());
       } else {
@@ -1066,6 +1115,7 @@ public class DefaultPassConfig extends PassConfig {
     protected CompilerPass create(AbstractCompiler compiler) {
       final boolean late = false;
       return new PeepholeOptimizationsPass(compiler,
+            new PeepholeMinimizeConditions(late),
             new PeepholeSubstituteAlternateSyntax(late),
             new PeepholeReplaceKnownMethods(late),
             new PeepholeRemoveDeadCode(),
@@ -1081,8 +1131,9 @@ public class DefaultPassConfig extends PassConfig {
     protected CompilerPass create(AbstractCompiler compiler) {
       final boolean late = true;
       return new PeepholeOptimizationsPass(compiler,
-            new StatementFusion(),
+            new StatementFusion(options.aggressiveFusion),
             new PeepholeRemoveDeadCode(),
+            new PeepholeMinimizeConditions(late),
             new PeepholeSubstituteAlternateSyntax(late),
             new PeepholeReplaceKnownMethods(late),
             new PeepholeFoldConstants(late),
@@ -1377,6 +1428,16 @@ public class DefaultPassConfig extends PassConfig {
     }
   };
 
+  /** Check memory bloat patterns */
+  final PassFactory checkEventfulObjectDisposal =
+      new PassFactory("checkEventfulObjectDisposal", true) {
+    @Override
+    protected CompilerPass create(AbstractCompiler compiler) {
+      return new CheckEventfulObjectDisposal(compiler,
+          options.checkEventfulObjectDisposalPolicy);
+    }
+  };
+
   /** Computes the names of functions for later analysis. */
   final PassFactory computeFunctionNames =
       new PassFactory("computeFunctionNames", true) {
@@ -1475,7 +1536,10 @@ public class DefaultPassConfig extends PassConfig {
       new PassFactory("rescopeGlobalSymbols", true) {
     @Override
     protected CompilerPass create(AbstractCompiler compiler) {
-      return new RescopeGlobalSymbols(compiler, options.renamePrefixNamespace);
+      return new RescopeGlobalSymbols(
+          compiler,
+          options.renamePrefixNamespace,
+          options.renamePrefixNamespaceAssumeCrossModuleNames);
     }
   };
 
@@ -1516,7 +1580,16 @@ public class DefaultPassConfig extends PassConfig {
     }
   };
 
-  /** Devirtualize property names based on type information. */
+  /** Disambiguate property names based on the coding convention. */
+  final PassFactory disambiguatePrivateProperties =
+      new PassFactory("disambiguatePrivateProperties", true) {
+    @Override
+    protected CompilerPass create(AbstractCompiler compiler) {
+      return new DisambiguatePrivateProperties(compiler);
+    }
+  };
+
+  /** Disambiguate property names based on type information. */
   final PassFactory disambiguateProperties =
       new PassFactory("disambiguateProperties", true) {
     @Override
@@ -2114,10 +2187,28 @@ public class DefaultPassConfig extends PassConfig {
     boolean preserveAnonymousFunctionNames =
         options.anonymousFunctionNaming != AnonymousFunctionNamingPolicy.OFF;
     Set<String> reservedNames = Sets.newHashSet();
+    if (options.renamePrefixNamespace != null) {
+      // don't use the prefix name as a global symbol.
+      reservedNames.add(options.renamePrefixNamespace);
+    }
     if (exportedNames != null) {
       reservedNames.addAll(exportedNames);
     }
     reservedNames.addAll(ParserRunner.getReservedVars());
+    if (options.alternateRenaming) {
+      RenameVars2 rn = new RenameVars2(
+          compiler,
+          options.renamePrefix,
+          options.variableRenaming == VariableRenamingPolicy.LOCAL,
+          preserveAnonymousFunctionNames,
+          options.generatePseudoNames,
+          options.shadowVariables,
+          prevVariableMap,
+          reservedChars,
+          reservedNames);
+      rn.process(externs, root);
+      return rn.getVariableMap();
+    }
     RenameVars rn = new RenameVars(
         compiler,
         options.renamePrefix,
@@ -2133,10 +2224,25 @@ public class DefaultPassConfig extends PassConfig {
   }
 
   /** Renames labels */
+  final PassFactory gatherCharBias = new PassFactory("gatherCharBias", true) {
+    @Override
+    protected CompilerPass create(AbstractCompiler compiler) {
+      return new GatherCharacterEncodingBias(
+          compiler,
+          getNameGenerator(),
+          options.variableRenaming != VariableRenamingPolicy.LOCAL);
+    }
+  };
+
+  /** Renames labels */
   final PassFactory renameLabels = new PassFactory("renameLabels", true) {
     @Override
     protected CompilerPass create(AbstractCompiler compiler) {
-      return new RenameLabels(compiler);
+      if (options.aggressiveRenaming) {
+        return new RenameLabels(compiler, getNameGenerator());
+      } else {
+        return new RenameLabels(compiler);
+      }
     }
   };
 
@@ -2189,6 +2295,25 @@ public class DefaultPassConfig extends PassConfig {
       };
     }
   };
+
+  /** Adds instrumentation for memory allocations. */
+  final PassFactory instrumentMemoryAllocations =
+      new PassFactory("instrumentMemoryAllocations", true) {
+        @Override
+        protected CompilerPass create(final AbstractCompiler compiler) {
+          return new InstrumentMemoryAllocPass(compiler);
+        }
+      };
+
+  final PassFactory instrumentForCodeCoverage =
+      new PassFactory("instrumentForCodeCoverage", true) {
+        @Override
+        protected CompilerPass create(final AbstractCompiler compiler) {
+          // TODO(johnlenz): make global instrumentation an option
+          return new CoverageInstrumentationPass(
+              compiler, CoverageReach.CONDITIONAL);
+        }
+      };
 
   /**
    * Create a no-op pass that can only run once. Used to break up loops.

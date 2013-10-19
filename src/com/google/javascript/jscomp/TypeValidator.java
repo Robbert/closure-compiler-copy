@@ -26,7 +26,6 @@ import static com.google.javascript.rhino.jstype.JSTypeNative.OBJECT_TYPE;
 import static com.google.javascript.rhino.jstype.JSTypeNative.STRING_TYPE;
 import static com.google.javascript.rhino.jstype.JSTypeNative.UNKNOWN_TYPE;
 import static com.google.javascript.rhino.jstype.JSTypeNative.VOID_TYPE;
-import static com.google.javascript.rhino.jstype.JSTypeRegistry.OBJECT_INDEX_TEMPLATE;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -40,6 +39,8 @@ import com.google.javascript.rhino.jstype.JSTypeNative;
 import com.google.javascript.rhino.jstype.JSTypeRegistry;
 import com.google.javascript.rhino.jstype.ObjectType;
 import com.google.javascript.rhino.jstype.StaticSlot;
+import com.google.javascript.rhino.jstype.TemplateTypeMap;
+import com.google.javascript.rhino.jstype.TemplateTypeMapReplacer;
 import com.google.javascript.rhino.jstype.UnknownType;
 
 import java.text.MessageFormat;
@@ -63,6 +64,7 @@ class TypeValidator {
   private final JSType allValueTypes;
   private boolean shouldReport = true;
   private final JSType nullOrUndefined;
+  private final boolean reportUnnecessaryCasts;
 
   // TODO(nicksantos): Provide accessors to better filter the list of type
   // mismatches. For example, if we pass (Cake|null) where only Cake is
@@ -75,10 +77,15 @@ class TypeValidator {
       "found   : {1}\n" +
       "required: {2}";
 
-  // TODO(johnlenz): reenable this after after the next release.
   static final DiagnosticType INVALID_CAST =
-      DiagnosticType.disabled("JSC_INVALID_CAST",
+      DiagnosticType.warning("JSC_INVALID_CAST",
           "invalid cast - must be a subtype or supertype\n" +
+          "from: {0}\n" +
+          "to  : {1}");
+
+  static final DiagnosticType UNNECESSARY_CAST =
+      DiagnosticType.disabled("JSC_UNNECESSARY_CAST",
+          "unnecessary cast\n" +
           "from: {0}\n" +
           "to  : {1}");
 
@@ -142,6 +149,8 @@ class TypeValidator {
         STRING_TYPE, NUMBER_TYPE, BOOLEAN_TYPE, NULL_TYPE, VOID_TYPE);
     this.nullOrUndefined = typeRegistry.createUnionType(
         NULL_TYPE, VOID_TYPE);
+    this.reportUnnecessaryCasts = ((Compiler) compiler).getOptions().enables(
+        DiagnosticGroups.UNNECESSARY_CASTS);
   }
 
   /**
@@ -336,9 +345,9 @@ class TypeValidator {
       ObjectType dereferenced = objType.dereference();
       if (dereferenced != null && dereferenced
           .getTemplateTypeMap()
-          .hasTemplateKey(OBJECT_INDEX_TEMPLATE)) {
+          .hasTemplateKey(typeRegistry.getObjectIndexKey())) {
         expectCanAssignTo(t, indexNode, indexType, dereferenced
-            .getTemplateTypeMap().getTemplateType(OBJECT_INDEX_TEMPLATE),
+            .getTemplateTypeMap().getTemplateType(typeRegistry.getObjectIndexKey()),
             "restricted index type");
       } else if (dereferenced != null && dereferenced.isArrayType()) {
         expectNumber(t, indexNode, indexType, "array access");
@@ -468,6 +477,10 @@ class TypeValidator {
     ObjectType implicitProto = subObject.getImplicitPrototype();
     ObjectType declaredSuper =
         implicitProto == null ? null : implicitProto.getImplicitPrototype();
+    if (declaredSuper != null && declaredSuper.isTemplatizedType()) {
+      declaredSuper =
+          declaredSuper.toMaybeTemplatizedType().getReferencedType();
+    }
     if (declaredSuper != null &&
         !(superObject instanceof UnknownType) &&
         !declaredSuper.isEquivalentTo(superObject)) {
@@ -500,6 +513,27 @@ class TypeValidator {
     if (!type.canCastTo(castType)) {
       registerMismatch(type, castType, report(t.makeError(n, INVALID_CAST,
           type.toString(), castType.toString())));
+    }
+  }
+
+  /**
+   * Expect that casting type to castType is necessary. A cast is considered
+   * unnecessary if type is a subtype of castType, or identical to castType.
+   *
+   * @param t The node traversal.
+   * @param n The node where warnings should point.
+   * @param castType The type being cast to.
+   * @param type The type being cast from.
+   */
+  void expectCastIsNecessary(NodeTraversal t, Node n, JSType castType, JSType type) {
+    if (!reportUnnecessaryCasts) {
+      return;
+    }
+
+    if (type.isEquivalentTo(castType) ||
+        (type.isSubtype(castType) && !castType.isSubtype(type))) {
+      report(t.makeError(n, UNNECESSARY_CAST,
+          type.toString(), castType.toString()));
     }
   }
 
@@ -620,10 +654,18 @@ class TypeValidator {
       propNode = propNode == null ? n : propNode;
 
       JSType found = propSlot.getType();
+      found = found.restrictByNotNullOrUndefined();
+
       JSType required
           = implementedInterface.getImplicitPrototype().getPropertyType(prop);
-      found = found.restrictByNotNullOrUndefined();
+      TemplateTypeMap typeMap = implementedInterface.getTemplateTypeMap();
+      if (!typeMap.isEmpty()) {
+        TemplateTypeMapReplacer replacer = new TemplateTypeMapReplacer(
+            typeRegistry, typeMap);
+        required = required.visit(replacer);
+      }
       required = required.restrictByNotNullOrUndefined();
+
       if (!found.isSubtype(required)) {
         // Implemented, but not correctly typed
         FunctionType constructor =
@@ -710,6 +752,21 @@ class TypeValidator {
    *     to an Object type, if possible.
    */
   String getReadableJSTypeName(Node n, boolean dereference) {
+    JSType type = getJSType(n);
+    if (dereference) {
+      ObjectType dereferenced = type.dereference();
+      if (dereferenced != null) {
+        type = dereferenced;
+      }
+    }
+
+    // The best type name is the actual type name.
+    if (type.isFunctionPrototypeType() ||
+        (type.toObjectType() != null &&
+         type.toObjectType().getConstructor() != null)) {
+      return type.toString();
+    }
+
     // If we're analyzing a GETPROP, the property may be inherited by the
     // prototype chain. So climb the prototype chain and find out where
     // the property was originally defined.
@@ -738,20 +795,8 @@ class TypeValidator {
       }
     }
 
-    JSType type = getJSType(n);
-    if (dereference) {
-      ObjectType dereferenced = type.dereference();
-      if (dereferenced != null) {
-        type = dereferenced;
-      }
-    }
-
     String qualifiedName = n.getQualifiedName();
-    if (type.isFunctionPrototypeType() ||
-        (type.toObjectType() != null &&
-         type.toObjectType().getConstructor() != null)) {
-      return type.toString();
-    } else if (qualifiedName != null) {
+    if (qualifiedName != null) {
       return qualifiedName;
     } else if (type.isFunctionType()) {
       // Don't show complex function names.

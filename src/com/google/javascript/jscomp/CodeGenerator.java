@@ -19,6 +19,7 @@ package com.google.javascript.jscomp;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import com.google.javascript.jscomp.CompilerOptions.LanguageMode;
 import com.google.javascript.rhino.Node;
 import com.google.javascript.rhino.Token;
 import com.google.javascript.rhino.TokenStream;
@@ -38,7 +39,7 @@ class CodeGenerator {
   private static final String GT_ESCAPED = "\\x3e";
 
   // A memoizer for formatting strings as JS strings.
-  private final Map<String, String> ESCAPED_JS_STRINGS = Maps.newHashMap();
+  private final Map<String, String> escapedJsStrings = Maps.newHashMap();
 
   private static final char[] HEX_CHARS
       = { '0', '1', '2', '3', '4', '5', '6', '7',
@@ -50,12 +51,14 @@ class CodeGenerator {
 
   private final boolean preferSingleQuotes;
   private final boolean trustedStrings;
+  private final LanguageMode languageMode;
 
   private CodeGenerator(CodeConsumer consumer) {
     cc = consumer;
     outputCharsetEncoder = null;
     preferSingleQuotes = false;
     trustedStrings = true;
+    languageMode = LanguageMode.ECMASCRIPT5;
   }
 
   static CodeGenerator forCostEstimation(CodeConsumer consumer) {
@@ -79,6 +82,7 @@ class CodeGenerator {
     }
     this.preferSingleQuotes = options.preferSingleQuotes;
     this.trustedStrings = options.trustedStrings;
+    this.languageMode = options.getLanguageOut();
   }
 
   /**
@@ -123,15 +127,7 @@ class CodeGenerator {
       // the IN_FOR_INIT_CLAUSE one.
       Context rhsContext = getContextForNoInOperator(context);
 
-      // Handle associativity.
-      // e.g. if the parse tree is a * (b * c),
-      // we can simply generate a * b * c.
-      if (last.getType() == type &&
-          NodeUtil.isAssociative(type)) {
-        addExpr(first, p, context);
-        cc.addOp(opstr, true);
-        addExpr(last, p, rhsContext);
-      } else if (NodeUtil.isAssignmentOp(n) && NodeUtil.isAssignmentOp(last)) {
+      if (NodeUtil.isAssignmentOp(n) && NodeUtil.isAssignmentOp(last)) {
         // Assignments are the only right-associative binary operators
         addExpr(first, p, context);
         cc.addOp(opstr, true);
@@ -161,6 +157,7 @@ class CodeGenerator {
         }
 
         if (childCount == 3) {
+          cc.maybeInsertSpace();
           add("finally");
           add(last, Context.PRESERVE_BLOCK);
         }
@@ -169,7 +166,10 @@ class CodeGenerator {
 
       case Token.CATCH:
         Preconditions.checkState(childCount == 2);
-        add("catch(");
+        cc.maybeInsertSpace();
+        add("catch");
+        cc.maybeInsertSpace();
+        add("(");
         add(first);
         add(")");
         add(last, Context.PRESERVE_BLOCK);
@@ -238,7 +238,8 @@ class CodeGenerator {
 
       case Token.COMMA:
         Preconditions.checkState(childCount == 2);
-        unrollBinaryOperator(n, Token.COMMA, ",", context, Context.OTHER, 0, 0);
+        unrollBinaryOperator(n, Token.COMMA, ",", context,
+            getContextForNoInOperator(context), 0, 0);
         break;
 
       case Token.NUMBER:
@@ -277,11 +278,12 @@ class CodeGenerator {
       case Token.HOOK: {
         Preconditions.checkState(childCount == 3);
         int p = NodeUtil.precedence(type);
+        Context rhsContext = getContextForNoInOperator(context);
         addExpr(first, p + 1, context);
         cc.addOp("?", true);
-        addExpr(first.getNext(), 1, Context.OTHER);
+        addExpr(first.getNext(), 1, rhsContext);
         cc.addOp(":", true);
-        addExpr(last, 1, Context.OTHER);
+        addExpr(last, 1, rhsContext);
         break;
       }
 
@@ -411,7 +413,9 @@ class CodeGenerator {
 
       case Token.FOR:
         if (childCount == 4) {
-          add("for(");
+          add("for");
+          cc.maybeInsertSpace();
+          add("(");
           if (first.isVar()) {
             add(first, Context.IN_FOR_INIT_CLAUSE);
           } else {
@@ -426,7 +430,9 @@ class CodeGenerator {
               last, getContextForNonEmptyExpression(context), false);
         } else {
           Preconditions.checkState(childCount == 3);
-          add("for(");
+          add("for");
+          cc.maybeInsertSpace();
+          add("(");
           add(first);
           add("in");
           add(first.getNext());
@@ -440,7 +446,10 @@ class CodeGenerator {
         Preconditions.checkState(childCount == 2);
         add("do");
         addNonEmptyStatement(first, Context.OTHER, false);
-        add("while(");
+        cc.maybeInsertSpace();
+        add("while");
+        cc.maybeInsertSpace();
+        add("(");
         add(last);
         add(")");
         cc.endStatement();
@@ -448,7 +457,9 @@ class CodeGenerator {
 
       case Token.WHILE:
         Preconditions.checkState(childCount == 2);
-        add("while(");
+        add("while");
+        cc.maybeInsertSpace();
+        add("(");
         add(first);
         add(")");
         addNonEmptyStatement(
@@ -474,8 +485,16 @@ class CodeGenerator {
         if (needsParens) {
           add(")");
         }
-        add(".");
-        addIdentifier(last.getString());
+        if (this.languageMode == LanguageMode.ECMASCRIPT3
+            && TokenStream.isKeyword(last.getString())) {
+          // Check for ECMASCRIPT3 keywords.
+          add("[");
+          add(last);
+          add("]");
+        } else {
+          add(".");
+          addIdentifier(last.getString());
+        }
         break;
       }
 
@@ -546,13 +565,16 @@ class CodeGenerator {
           cc.beginBlock();
         }
 
-        add("if(");
+        add("if");
+        cc.maybeInsertSpace();
+        add("(");
         add(first);
         add(")");
 
         if (hasElse) {
           addNonEmptyStatement(
               first.getNext(), Context.BEFORE_DANGLING_ELSE, false);
+          cc.maybeInsertSpace();
           add("else");
           addNonEmptyStatement(
               last, getContextForNonEmptyExpression(context), false);
@@ -682,12 +704,13 @@ class CodeGenerator {
             String key = c.getString();
             // Object literal property names don't have to be quoted if they
             // are not JavaScript keywords
-            if (!c.isQuotedString() &&
-                !TokenStream.isKeyword(key) &&
-                TokenStream.isJSIdentifier(key) &&
+            if (!c.isQuotedString()
+                && !(languageMode == LanguageMode.ECMASCRIPT3
+                    && TokenStream.isKeyword(key))
+                && TokenStream.isJSIdentifier(key)
                 // do not encode literally any non-literal characters that
                 // were Unicode escaped.
-                NodeUtil.isLatin(key)) {
+                && NodeUtil.isLatin(key)) {
               add(key);
             } else {
               // Determine if the string is a simple number.
@@ -738,6 +761,9 @@ class CodeGenerator {
         }
         add(first);
         add(":");
+        if (!last.isBlock()) {
+          cc.maybeInsertSpace();
+        }
         addNonEmptyStatement(
             last, getContextForNonEmptyExpression(context), true);
         break;
@@ -782,13 +808,16 @@ class CodeGenerator {
 
   static boolean isSimpleNumber(String s) {
     int len = s.length();
+    if (len == 0) {
+      return false;
+    }
     for (int index = 0; index < len; index++) {
       char c = s.charAt(index);
       if (c < '0' || c > '9') {
         return false;
       }
     }
-    return len > 0 && s.charAt(0) != '0';
+    return len == 1 || s.charAt(0) != '0';
   }
 
   static double getSimpleNumber(String s) {
@@ -931,7 +960,8 @@ class CodeGenerator {
         addExpr(n, isArrayOrFunctionArgument ? 1 : 0, lhsContext);
       } else {
         cc.listSeparator();
-        addExpr(n, isArrayOrFunctionArgument ? 1 : 0, Context.OTHER);
+        addExpr(n, isArrayOrFunctionArgument ? 1 : 0,
+            getContextForNoInOperator(lhsContext));
       }
     }
   }
@@ -978,10 +1008,10 @@ class CodeGenerator {
     if (useSlashV) {
       add(jsString(n.getString(), useSlashV));
     } else {
-      String cached = ESCAPED_JS_STRINGS.get(s);
+      String cached = escapedJsStrings.get(s);
       if (cached == null) {
         cached = jsString(n.getString(), useSlashV);
-        ESCAPED_JS_STRINGS.put(s, cached);
+        escapedJsStrings.put(s, cached);
       }
       add(cached);
     }
@@ -1118,16 +1148,16 @@ class CodeGenerator {
           // Break </script into <\/script
           // As above, this is just to prevent developers from doing this
           // accidentally.
-          final String END_SCRIPT = "/script";
+          final String endScript = "/script";
 
           // Break <!-- into <\!--
-          final String START_COMMENT = "!--";
+          final String startComment = "!--";
 
-          if (s.regionMatches(true, i + 1, END_SCRIPT, 0,
-                              END_SCRIPT.length())) {
+          if (s.regionMatches(true, i + 1, endScript, 0,
+                              endScript.length())) {
             sb.append(LT_ESCAPED);
-          } else if (s.regionMatches(false, i + 1, START_COMMENT, 0,
-                                     START_COMMENT.length())) {
+          } else if (s.regionMatches(false, i + 1, startComment, 0,
+                                     startComment.length())) {
             sb.append(LT_ESCAPED);
           } else {
             sb.append(c);
@@ -1193,7 +1223,7 @@ class CodeGenerator {
     Node c = n.getFirstChild();
     for (; c != null && i < maxCount; c = c.getNext()) {
       if (c.isBlock()) {
-        i += getNonEmptyChildCount(c, maxCount-i);
+        i += getNonEmptyChildCount(c, maxCount - i);
       } else if (!c.isEmpty()) {
         i++;
       }

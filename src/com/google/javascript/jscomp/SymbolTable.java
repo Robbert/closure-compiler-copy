@@ -165,7 +165,7 @@ public final class SymbolTable
    * undefined.
    */
   public Ordering<Symbol> getNaturalSymbolOrdering() {
-    return SYMBOL_ORDERING;
+    return symbolOrdering;
   }
 
   @Override
@@ -498,7 +498,7 @@ public final class SymbolTable
    * "function%0", "function%1", etc.
    */
   public void addAnonymousFunctions() {
-    TreeSet<SymbolScope> scopes = Sets.newTreeSet(LEXICAL_SCOPE_ORDERING);
+    TreeSet<SymbolScope> scopes = Sets.newTreeSet(lexicalScopeOrdering);
     for (SymbolScope scope : getAllScopes()) {
       if (scope.isLexicalScope()) {
         scopes.add(scope);
@@ -950,11 +950,14 @@ public final class SymbolTable
     ObjectType instanceType = type;
     Iterable<String> propNames = type.getOwnPropertyNames();
     if (instanceType.isFunctionPrototypeType()) {
-      // Merge the properties of "Foo.prototype" and "new Foo()" together.
-      instanceType = instanceType.getOwnerFunction().getInstanceType();
-      Set<String> set = Sets.newHashSet(propNames);
-      Iterables.addAll(set, instanceType.getOwnPropertyNames());
-      propNames = set;
+      // Guard against modifying foo.prototype when foo is a regular (non-constructor) function.
+      if (instanceType.getOwnerFunction().hasInstanceType()) {
+        // Merge the properties of "Foo.prototype" and "new Foo()" together.
+        instanceType = instanceType.getOwnerFunction().getInstanceType();
+        Set<String> set = Sets.newHashSet(propNames);
+        Iterables.addAll(set, instanceType.getOwnPropertyNames());
+        propNames = set;
+      }
     }
 
     s.setPropertyScope(new SymbolScope(null, parentPropertyScope, type, s));
@@ -1043,6 +1046,7 @@ public final class SymbolTable
     return myScope;
   }
 
+  /** A symbol-table entry */
   public static final class Symbol extends SimpleSlot {
     // Use a linked hash map, so that the results are deterministic
     // (and so the declaration always comes first).
@@ -1149,12 +1153,14 @@ public final class SymbolTable
     }
   }
 
+  /** Reference */
   public static final class Reference extends SimpleReference<Symbol> {
     Reference(Symbol symbol, Node node) {
       super(symbol, node);
     }
   }
 
+  /** Scope of a symbol */
   public static final class SymbolScope implements StaticScope<JSType> {
     private final Node rootNode;
     private final SymbolScope parent;
@@ -1533,17 +1539,11 @@ public final class SymbolTable
 
     public void visitTypeNode(SymbolScope scope, Node n) {
       if (n.isString()) {
-        Symbol symbol = scope.getSlot(n.getString());
-        if (symbol == null) {
-          // If we can't find this type, it might be a reference to a
-          // primitive type (like {string}). Autobox it to check.
-          JSType type = typeRegistry.getType(n.getString());
-          JSType autobox = type == null ? null : type.autoboxesTo();
-          symbol = autobox == null
-              ? null : getSymbolForTypeHelper(autobox, true);
-        }
+        Symbol symbol = lookupPossiblyDottedName(scope, n.getString());
         if (symbol != null) {
           symbol.defineReferenceAt(n);
+        } else {
+          logger.warning("Could not find symbol for type: " + n.getString());
         }
       }
 
@@ -1552,16 +1552,48 @@ public final class SymbolTable
         visitTypeNode(scope, child);
       }
     }
+
+    // TODO(peterhal): @template types.
+    private Symbol lookupPossiblyDottedName(SymbolScope scope, String dottedName) {
+      // Try the dotted name to start.
+      String[] names = dottedName.split("\\.");
+      Symbol result = null;
+      SymbolScope currentScope = scope;
+      for (int i = 0; i < names.length; i++) {
+        String name = names[i];
+        result = currentScope.getSlot(name);
+        if (result == null) {
+          break;
+        }
+        if (i < (names.length - 1)) {
+          currentScope = result.getPropertyScope();
+          if (currentScope == null) {
+            result = null;
+            break;
+          }
+        }
+      }
+
+      if (result == null) {
+        // If we can't find this type, it might be a reference to a
+        // primitive type (like {string}). Autobox it to check.
+        JSType type = typeRegistry.getType(dottedName);
+        JSType autobox = type == null ? null : type.autoboxesTo();
+        result = autobox == null
+            ? null : getSymbolForTypeHelper(autobox, true);
+      }
+      return result;
+    }
   }
 
   // Comparators
-  private final Ordering<String> SOURCE_NAME_ORDERING =
+  private final Ordering<String> sourceNameOrdering =
       Ordering.natural().nullsFirst();
 
-  private final Ordering<Node> NODE_ORDERING = new Ordering<Node>() {
+  private final Ordering<Node> nodeOrdering = new Ordering<Node>() {
     @Override
     public int compare(Node a, Node b) {
-      int result = SOURCE_NAME_ORDERING.compare(
+      int result = sourceNameOrdering.compare(
           a.getSourceFileName(), b.getSourceFileName());
       if (result != 0) {
         return result;
@@ -1573,17 +1605,17 @@ public final class SymbolTable
     }
   };
 
-  private final Ordering<SymbolScope> LEXICAL_SCOPE_ORDERING =
+  private final Ordering<SymbolScope> lexicalScopeOrdering =
       new Ordering<SymbolScope>() {
     @Override
     public int compare(SymbolScope a, SymbolScope b) {
       Preconditions.checkState(a.isLexicalScope() && b.isLexicalScope(),
                                "We can only sort lexical scopes");
-      return NODE_ORDERING.compare(a.getRootNode(), b.getRootNode());
+      return nodeOrdering.compare(a.getRootNode(), b.getRootNode());
     }
   };
 
-  private final Ordering<Symbol> SYMBOL_ORDERING = new Ordering<Symbol>() {
+  private final Ordering<Symbol> symbolOrdering = new Ordering<Symbol>() {
     @Override
     public int compare(Symbol a, Symbol b) {
       SymbolScope scopeA = getScope(a);

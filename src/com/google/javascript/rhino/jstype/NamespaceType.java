@@ -23,7 +23,6 @@
  *
  * Contributor(s):
  *   Nick Santos
- *   Google Inc.
  *
  * Alternatively, the contents of this file may be used under the terms of
  * the GNU General Public License Version 2 or later (the "GPL"), in which
@@ -39,38 +38,37 @@
 
 package com.google.javascript.rhino.jstype;
 
-import com.google.common.base.Preconditions;
 import com.google.javascript.rhino.ErrorReporter;
-import com.google.javascript.rhino.Node;
 
 /**
- * An {@code UnresolvedType} is a reference to some type expression.
- * This provides a convenient mechanism for implementing forward
- * references to types; a {@code UnresolvedType} can be used as a
- * placeholder until its reference is resolved.
+ * A namespace type is a reference to a particular object.
  *
- * The {@code UnresolvedType} will behave like an opaque unknown type.
- * When its {@code #resolve} method is called, it will return the underlying
- * type. The underlying type can resolve to any JS type.<p>
+ * This is generally useful when you have a particular object
+ * in mind, but need to give it a name when it's passed to a function.
  *
- * @author nicksantos@google.com (Nick Santos)
+ * For example,
+ * <code>
+ * /** @namespace /
+ * var jQuery = {};
+ *
+ * /** @return {jQuery.} /
+ * jQuery.get = function () {
+ *   return jQuery // for easy chaining
+ * }
+ * </code>
+ *
+ * @see "https://docs.google.com/document/d/1r37CJ6ZW0zk28IMn1Tu8UKKjs2WcJ-6dNEb3om7FoHQ"
+ * @author nicholas.j.santos@gmail.com (Nick Santos)
  */
-class UnresolvedTypeExpression extends UnknownType {
+class NamespaceType extends NamedType {
   private static final long serialVersionUID = 1L;
 
-  private final Node typeExpr;
-  private final String sourceName;
-
   /**
-   * Create a named type based on the reference.
+   * Create a namespace type based on the reference.
    */
-  UnresolvedTypeExpression(JSTypeRegistry registry, Node typeExpr,
-      String sourceName) {
-    super(registry, false);
-
-    Preconditions.checkNotNull(typeExpr);
-    this.typeExpr = typeExpr;
-    this.sourceName = sourceName;
+  NamespaceType(JSTypeRegistry registry, String reference,
+      String sourceName, int lineno, int charno) {
+    super(registry, reference, sourceName, lineno, charno);
   }
 
   /**
@@ -78,6 +76,7 @@ class UnresolvedTypeExpression extends UnknownType {
    */
   @Override
   JSType resolveInternal(ErrorReporter t, StaticScope<JSType> enclosing) {
-    return registry.createFromTypeNodes(typeExpr, sourceName, enclosing);
+    warning(t, "Namespaces not supported yet (" + getReferenceName() + ")");
+    return registry.getNativeObjectType(JSTypeNative.UNKNOWN_TYPE);
   }
 }

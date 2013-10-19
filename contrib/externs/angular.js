@@ -25,13 +25,9 @@
  *     $cookies
  *     $cookieStore
  *     $document
- *     $exceptionHandler
- *     $filter
- *     $filterProvider
  *     $httpBackend
  *     $interpolate
  *     $locale
- *     $parse
  *     $resource
  *     $rootElement
  *     $rootScope
@@ -73,9 +69,9 @@ var angular = {};
 angular.bind = function(self, fn, args) {};
 
 /**
- * @param {Element} element
+ * @param {Element|HTMLDocument} element
  * @param {Array.<string|Function>=} opt_modules
- * @return {function()}
+ * @return {angular.$injector}
  */
 angular.bootstrap = function(element, opt_modules) {};
 
@@ -90,7 +86,7 @@ angular.copy = function(source, opt_dest) {};
 /**
  * @param {(JQLiteSelector|Object)} element
  * @param {(JQLiteSelector|Object)=} opt_context
- * @return {Object}
+ * @return {angular.JQLite}
  */
 angular.element = function(element, opt_context) {};
 
@@ -204,8 +200,24 @@ angular.mock = {};
  */
 angular.module = function(name, opt_requires, opt_configFn) {};
 
+angular.noop = function() {};
+
+/**
+ * @param {Object|Array|Date|string|number} obj
+ * @param {boolean=} opt_pretty
+ * @return {string}
+ */
+angular.toJson = function(obj, opt_pretty) {};
+
+/**
+ * @param {string} s
+ * @return {string}
+ */
+angular.uppercase = function(s) {};
+
 /**
  * @typedef {{
+ *   $attr: Object.<string,string>,
  *   $normalize: function(string): string,
  *   $observe: function(string, function(*)): function(*),
  *   $set: function(string, ?(string|boolean), boolean=, string=)
@@ -236,6 +248,133 @@ angular.Attributes.$set = function(key, value, opt_writeAttr, opt_attrName) {};
 
 /**
  * @typedef {{
+ *   pre: (function(
+ *       angular.Scope=, angular.JQLite=, angular.Attributes=, Object=)|
+ *       undefined),
+ *   post: (function(
+ *       angular.Scope=, angular.JQLite=, angular.Attributes=, Object=)|
+ *       undefined)
+ *   }}
+ */
+angular.LinkingFunctions;
+
+/**
+ * @param {angular.Scope=} scope
+ * @param {angular.JQLite=} iElement
+ * @param {angular.Attributes=} iAttrs
+ * @param {(Object|Array.<Object>)=} controller
+ */
+angular.LinkingFunctions.pre = function(scope, iElement, iAttrs, controller) {};
+
+/**
+ * @param {angular.Scope=} scope
+ * @param {angular.JQLite=} iElement
+ * @param {angular.Attributes=} iAttrs
+ * @param {(Object|Array.<Object>)=} controller
+ */
+angular.LinkingFunctions.post = function(scope, iElement, iAttrs, controller) {
+};
+
+/**
+ * @typedef {{
+ *   compile: (function(
+ *       angular.JQLite=, angular.Attributes=, Function=)|undefined),
+ *   controller: (Function|undefined),
+ *   controllerAs: (string|undefined),
+ *   link: (function(
+ *       angular.Scope=, angular.JQLite=, angular.Attributes=,
+ *       (Object|Array.<Object>)=)|
+ *       undefined),
+ *   name: (string|undefined),
+ *   priority: (number|undefined),
+ *   replace: (boolean|undefined),
+ *   require: (string|Array.<string>|undefined),
+ *   restrict: (string|undefined),
+ *   scope: (boolean|Object.<string, string>|undefined),
+ *   template: (string|undefined),
+ *   templateUrl: (string|undefined),
+ *   terminal: (boolean|undefined),
+ *   transclude: (boolean|string|undefined)
+ *   }}
+ */
+angular.Directive;
+
+/**
+ * @param {angular.JQLite=} tElement
+ * @param {angular.Attributes=} tAttrs
+ * @param {Function=} transclude
+ * @return {Function|angular.LinkingFunctions|undefined}
+ */
+angular.Directive.compile = function(tElement, tAttrs, transclude) {};
+
+angular.Directive.controller = function() {};
+
+/**
+ * @type {string|undefined}
+ */
+angular.Directive.controllerAs;
+
+/**
+ * @param {angular.Scope=} scope
+ * @param {angular.JQLite=} iElement
+ * @param {angular.Attributes=} iAttrs
+ * @param {(Object|Array.<Object>)=} controller
+ */
+angular.Directive.link = function(scope, iElement, iAttrs, controller) {};
+
+/**
+ * @type {(string|undefined)}
+ */
+angular.Directive.name;
+
+/**
+ * @type {(number|undefined)}
+ */
+angular.Directive.priority;
+
+/**
+ * @type {(boolean|undefined)}
+ */
+angular.Directive.replace;
+
+/**
+ * @type {(string|Array.<string>|undefined)}
+ */
+angular.Directive.require;
+
+/**
+ * @type {(string|undefined)}
+ */
+angular.Directive.restrict;
+
+/**
+ * @type {(boolean|Object.<string, string>|undefined)}
+ */
+angular.Directive.scope;
+
+/**
+ * @type {(string|undefined)}
+ * TODO: This can also be a function which returns a string.
+ */
+angular.Directive.template;
+
+/**
+ * @type {(string|undefined)}
+ */
+angular.Directive.templateUrl;
+
+/**
+ * @type {(boolean|undefined)}
+ */
+angular.Directive.terminal;
+
+/**
+ * @type {(boolean|string|undefined)}
+ */
+angular.Directive.transclude;
+
+/**
+ * @typedef {{
  *   addClass: function(string): angular.JQLite,
  *   after: function(JQLiteSelector): angular.JQLite,
  *   append: function(JQLiteSelector): angular.JQLite,
@@ -255,6 +394,8 @@ angular.Attributes.$set = function(key, value, opt_writeAttr, opt_attrName) {};
  *   injector: function(): angular.$injector,
  *   length: number,
  *   next: function(): angular.JQLite,
+ *   on: function(string, Function): angular.JQLite,
+ *   off: function(string=, Function=): angular.JQLite,
  *   parent: function(): angular.JQLite,
  *   prepend: function(JQLiteSelector): angular.JQLite,
  *   prop: function(string, *=): *,
@@ -267,6 +408,7 @@ angular.Attributes.$set = function(key, value, opt_writeAttr, opt_attrName) {};
  *   scope: function(): angular.Scope,
  *   text: function(string=): (angular.JQLite|string),
  *   toggleClass: function(string, boolean=): angular.JQLite,
+ *   triggerHandler: function(string, *=): angular.JQLite,
  *   unbind: function(string=, Function=): angular.JQLite,
  *   val: function(string=): (angular.JQLite|string),
  *   wrap: function(JQLiteSelector): angular.JQLite
@@ -386,6 +528,20 @@ angular.JQLite.length;
 angular.JQLite.next = function() {};
 
 /**
+ * @param {string} type
+ * @param {Function} fn
+ * @return {angular.JQLite}
+ */
+angular.JQLite.on = function(type, fn) {};
+
+/**
+ * @param {string=} opt_type
+ * @param {Function=} opt_fn
+ * @return {angular.JQLite}
+ */
+angular.JQLite.off = function(opt_type, opt_fn) {};
+
+/**
  * @return {angular.JQLite}
  */
 angular.JQLite.parent = function() {};
@@ -456,6 +612,13 @@ angular.JQLite.text = function(opt_value) {};
 angular.JQLite.toggleClass = function(name, opt_condition) {};
 
 /**
+ * @param {string} type
+ * @param {*=} opt_value
+ * @return {angular.JQLite}
+ */
+angular.JQLite.triggerHandler = function(type, opt_value) {};
+
+/**
  * @param {string=} opt_type
  * @param {Function=} opt_fn
  * @return {angular.JQLite}
@@ -479,7 +642,8 @@ angular.JQLite.wrap = function(element) {};
  *   config: function((Function|Array.<string|Function>)):angular.Module,
  *   constant: function(string, *):angular.Module,
  *   controller:
- *       function(string, (Function|Array.<string|Function>)):angular.Module,
+ *       (function(string, (Function|Array.<string|Function>)):angular.Module|
+ *       function(!Object.<(Function|Array.<string|Function>)>):angular.Module),
  *   directive:
  *       (function(string, (Function|Array.<string|Function>)):angular.Module|
  *       function(!Object.<(Function|Array.<string|Function>)>):angular.Module),
@@ -488,8 +652,8 @@ angular.JQLite.wrap = function(element) {};
  *   filter:
  *       function(string, (Function|Array.<string|Function>)):angular.Module,
  *   name: string,
- *   provider:
- *       function(string, (Function|Array.<string|Function>)):angular.Module,
+ *   provider: function(string,
+ *       (Object|Function|Array.<string|Function>)):angular.Module,
  *   requires: Array.<string>,
  *   run: function((Function|Array.<string|Function>)):angular.Module,
  *   service:
@@ -577,10 +741,9 @@ angular.Module.name = '';
  */
 angular.Module.requires;
 
-angular.noop = function() {};
-
 /**
  * @typedef {{
+ *   $$phase: string,
  *   $apply: function((string|function(angular.Scope))=):*,
  *   $broadcast: function(string, ...[*]),
  *   $destroy: function(),
@@ -592,11 +755,15 @@ angular.noop = function() {};
  *   $new: function(boolean=):angular.Scope,
  *   $on: function(string, function(angular.Scope.Event, ...[?])):function(),
  *   $parent: angular.Scope,
+ *   $root: angular.Scope,
  *   $watch: function(
  *       (string|Function), (string|Function)=, boolean=):function()
  *   }}
  */
 angular.Scope;
+
+/** @type {string} */
+angular.Scope.$$phase;
 
 /**
  * @param {(string|function(angular.Scope))=} opt_exp
@@ -651,6 +818,9 @@ angular.Scope.$on = function(name, listener) {};
 /** @type {angular.Scope} */
 angular.Scope.$parent;
 
+/** @type {!angular.Scope} */
+angular.Scope.$root;
+
 /**
  * @param {string|Function} exp
  * @param {(string|Function)=} opt_listener
@@ -686,19 +856,6 @@ angular.Scope.Event.stopPropagation = function() {};
 
 /** @type {angular.Scope} */
 angular.Scope.Event.targetScope;
-
-/**
- * @param {Object|Array|Date|string|number} obj
- * @param {boolean=} opt_pretty
- * @return {string}
- */
-angular.toJson = function(obj, opt_pretty) {};
-
-/**
- * @param {string} s
- * @return {string}
- */
-angular.uppercase = function(s) {};
 
 /**
  * @type {Object}
@@ -803,6 +960,53 @@ angular.$cacheFactory.Cache;
 angular.$cacheFactory.Cache.Info;
 
 /******************************************************************************
+ * $exceptionHandler Service
+ *****************************************************************************/
+
+/**
+ * @typedef {function(Error, string=)}
+ */
+angular.$exceptionHandler;
+
+/******************************************************************************
+ * $filter Service
+ *****************************************************************************/
+
+/**
+ * @typedef {function(string): !Function}
+ */
+angular.$filter;
+
+/**
+ * The 'orderBy' filter is available through $filterProvider and AngularJS
+ * injection; but is not accessed through a documented public API of AngularJS.
+ * <p>In current AngularJS version the injection is satisfied by
+ * angular.orderByFunction, where the implementation is found.
+ * <p>See http://docs.angularjs.org/api/ng.filter:orderBy.
+ * @typedef {function(Array,
+ *     (string|function(?):*|Array.<(string|function(?):*)>),
+ *     boolean=): Array}
+ */
+angular.$filter.orderBy;
+
+/******************************************************************************
+ * $filterProvider Service
+ *****************************************************************************/
+
+/**
+ * @typedef {{
+ *   register: function(string, (Function|Array.<string|Function>))
+ *   }}
+ */
+angular.$filterProvider;
+
+/**
+ * @param {string} name
+ * @param {(Function|Array.<string|Function>)} fn
+ */
+angular.$filterProvider.register = function(name, fn) {};
+
+/******************************************************************************
  * $http Service
  *****************************************************************************/
 
@@ -833,6 +1037,9 @@ angular.$http;
  *   params: (Object.<(string|Object)>|undefined),
  *   timeout: (number|undefined),
  *   transformRequest:
+ *       (function((string|Object), Object):(string|Object)|
+ *       Array.<function((string|Object), Object):(string|Object)>|undefined),
+ *   transformResponse:
  *       (function((string|Object), Object):(string|Object)|
  *       Array.<function((string|Object), Object):(string|Object)>|undefined),
  *   url: (string|undefined),
@@ -900,37 +1107,39 @@ angular.$http.defaults;
 angular.$http.pendingRequests;
 
 /**
+ * @typedef {function((string|Object), number,
+ *     function(string=): (string|Object|null), angular.$http.Config)}
+ */
+angular.HttpCallback;
+
+/**
  * @typedef {{
  *   then: function(
  *       ?function(!angular.$http.Response),
- *       function(!angular.$http.Response)=): angular.$http.HttpPromise,
- *   success: function(function(
- *       (string|Object), number, function(string=): (string|Object),
- *       !angular.$http.Config)),
- *   error: function(function(
- *       (string|Object), number, function(string=): (string|Object),
- *       !angular.$http.Config))
- *   }}
+ *       ?function(!angular.$http.Response)=): angular.$http.HttpPromise,
+ *   success: function(angular.HttpCallback): angular.$http.HttpPromise,
+ *   error: function(angular.HttpCallback): angular.$http.HttpPromise
+ * }}
  */
 angular.$http.HttpPromise;
 
 /**
  * @param {?function(!angular.$http.Response)} successCallback
- * @param {function(!angular.$http.Response)=} opt_errorCallback
+ * @param {?function(!angular.$http.Response)=} opt_errorCallback
  * @return {angular.$http.HttpPromise}
  */
 angular.$http.HttpPromise.then = function(
     successCallback, opt_errorCallback) {};
 
 /**
- * @param {function((string|Object), number,
- *         function(string):string, Object)} callback
+ * @param {angular.HttpCallback} callback
+ * @return {!angular.$http.HttpPromise} Promise for chaining.
  */
 angular.$http.HttpPromise.success = function(callback) {};
 
 /**
- * @param {function((string|Object), number,
- *         function(string):string, Object)} callback
+ * @param {angular.HttpCallback} callback
+ * @return {!angular.$http.HttpPromise} Promise for chaining.
  */
 angular.$http.HttpPromise.error = function(callback) {};
 
@@ -951,10 +1160,10 @@ angular.$http.Response;
 /**
  * @typedef {{
  *   annotate: function((Function|Array.<string|Function>)):Array.<string>,
- *   get: function(string):*,
+ *   get: function(string):(?),
  *   instantiate: function(Function, Object=):Object,
  *   invoke: function(
- *       (Function|Array.<string|Function>), Object=, Object=):*
+ *       (Function|Array.<string|Function>), Object=, Object=):(?)
  *   }}
  */
 angular.$injector;
@@ -967,7 +1176,7 @@ angular.$injector.annotate = function(fn) {};
 
 /**
  * @param {string} name
- * @return {*}
+ * @return {?}
  */
 angular.$injector.get = function(name) {};
 
@@ -982,7 +1191,7 @@ angular.$injector.instantiate = function(type, opt_locals) {};
  * @param {(Function|Array.<string|Function>)} fn
  * @param {Object=} opt_self
  * @param {Object=} opt_locals
- * @return {*}
+ * @return {?}
  */
 angular.$injector.invoke = function(fn, opt_self, opt_locals) {};
 
@@ -1207,6 +1416,70 @@ angular.NgModelController.prototype.$viewChangeListeners;
 angular.NgModelController.prototype.$viewValue;
 
 /******************************************************************************
+ * FormController
+ *****************************************************************************/
+
+/**
+ * @constructor
+ */
+angular.FormController = function() {};
+
+/**
+ * @type {boolean}
+ */
+angular.FormController.prototype.$dirty;
+
+/**
+ * @type {!Object.<boolean>}
+ */
+angular.FormController.prototype.$error;
+
+/**
+ * @type {boolean}
+ */
+angular.FormController.prototype.$invalid;
+
+/**
+ * @type {boolean}
+ */
+angular.FormController.prototype.$pristine;
+
+/**
+ * @type {boolean}
+ */
+angular.FormController.prototype.$valid;
+
+/******************************************************************************
+ * $parse Service
+ *****************************************************************************/
+
+/**
+ * @typedef {function(string):!angular.$parse.Expression}
+ */
+angular.$parse;
+
+/**
+ * @typedef {function((!angular.Scope|!Object), Object=):*}
+ */
+angular.$parse.Expression;
+
+/**
+ * Augment the angular.$parse.Expression type definition by reopening the type
+ * via an artificial angular.$parse instance.
+ *
+ * This allows us to define methods on function objects which is something
+ * that can't be expressed via typical type annotations.
+ *
+ * @type {angular.$parse.Expression}
+ */
+angular.$parse_;
+
+/**
+ * @type {function((!angular.Scope|!Object), *)}
+ */
+angular.$parse_.assign = function(scope, newValue) {};
+
+/******************************************************************************
  * $provide Service
  *****************************************************************************/
 
@@ -1319,13 +1592,13 @@ angular.$q.Deferred.reject = function(opt_reason) {};
 angular.$q.Deferred.promise;
 
 /**
- * @typedef {{then: function(?function(?), function(?)=): angular.$q.Promise}}
+ * @typedef {{then: function(?function(?), ?function(?)=): angular.$q.Promise}}
  */
 angular.$q.Promise;
 
 /**
  * @param {?function(?)} successCallback
- * @param {function(?)=} opt_errorCallback
+ * @param {?function(?)=} opt_errorCallback
  * @return {angular.$q.Promise}
  */
 angular.$q.Promise.then = function(successCallback, opt_errorCallback) {};
@@ -1442,6 +1715,174 @@ angular.$routeProvider.Params.redirectTo;
 
 /** @type {boolean} */
 angular.$routeProvider.Params.reloadOnSearch;
+
+
+/******************************************************************************
+ * $sce Service
+ *****************************************************************************/
+
+/**
+ * Ref: http://docs.angularjs.org/api/ng.$sce
+ *
+ * @typedef {{
+ *   HTML: string,
+ *   CSS: string,
+ *   URL: string,
+ *   JS: string,
+ *   RESOURCE_URL: string,
+ *   isEnabled: function(): boolean,
+ *   parseAs: function(string, string): !angular.$parse.Expression,
+ *   getTrusted: function(string, *): string,
+ *   trustAs: function(string, string): *,
+ *   parseAsHtml: function(string): !angular.$parse.Expression,
+ *   parseAsCss: function(string): !angular.$parse.Expression,
+ *   parseAsUrl: function(string): !angular.$parse.Expression,
+ *   parseAsJs: function(string): !angular.$parse.Expression,
+ *   parseAsResourceUrl: function(string): !angular.$parse.Expression,
+ *   getTrustedHtml: function(*): string,
+ *   getTrustedCss: function(*): string,
+ *   getTrustedUrl: function(*): string,
+ *   getTrustedJs: function(*): string,
+ *   getTrustedResourceUrl: function(*): string,
+ *   trustAsHtml: function(string): *,
+ *   trustAsCss: function(string): *,
+ *   trustAsUrl: function(string): *,
+ *   trustAsJs: function(string): *,
+ *   trustAsResourceUrl: function(string): *
+ *   }}
+ *****************************************************************************/
+angular.$sce;
+
+
+/** @const {string} */
+angular.$sce.HTML;
+
+/** @const {string} */
+angular.$sce.CSS;
+
+/** @const {string} */
+angular.$sce.URL;
+
+/** @const {string} */
+angular.$sce.JS;
+
+/** @const {string} */
+angular.$sce.RESOURCE_URL;
+
+/** @return {boolean} */
+angular.$sce.isEnabled = function() {};
+
+/**
+ * @param {string} type
+ * @param {string} expression
+ * @return {!angular.$parse.Expression}
+ */
+angular.$sce.parseAs = function(type, expression) {};
+
+/**
+ * @param {string} type
+ * @param {*} maybeTrusted
+ * @return {string}
+ */
+angular.$sce.getTrusted = function(type, maybeTrusted) {};
+
+/**
+ * @param {string} type
+ * @param {string} trustedValue
+ * @return {*}
+ */
+angular.$sce.trustAs = function(type, trustedValue) {};
+
+/**
+ * @param {string} expression
+ * @return {!angular.$parse.Expression}
+ */
+angular.$sce.parseAsHtml = function(expression) {};
+
+/**
+ * @param {string} expression
+ * @return {!angular.$parse.Expression}
+ */
+angular.$sce.parseAsCss = function(expression) {};
+
+/**
+ * @param {string} expression
+ * @return {!angular.$parse.Expression}
+ */
+angular.$sce.parseAsUrl = function(expression) {};
+
+/**
+ * @param {string} expression
+ * @return {!angular.$parse.Expression}
+ */
+angular.$sce.parseAsJs = function(expression) {};
+
+/**
+ * @param {string} expression
+ * @return {!angular.$parse.Expression}
+ */
+angular.$sce.parseAsResourceUrl = function(expression) {};
+
+/**
+ * @param {*} maybeTrusted
+ * @return {string}
+ */
+angular.$sce.getTrustedHtml = function(maybeTrusted) {};
+
+/**
+ * @param {*} maybeTrusted
+ * @return {string}
+ */
+angular.$sce.getTrustedCss = function(maybeTrusted) {};
+
+/**
+ * @param {*} maybeTrusted
+ * @return {string}
+ */
+angular.$sce.getTrustedUrl = function(maybeTrusted) {};
+
+/**
+ * @param {*} maybeTrusted
+ * @return {string}
+ */
+angular.$sce.getTrustedJs = function(maybeTrusted) {};
+
+/**
+ * @param {*} maybeTrusted
+ * @return {string}
+ */
+angular.$sce.getTrustedResourceUrl = function(maybeTrusted) {};
+
+/**
+ * @param {string} trustedValue
+ * @return {*}
+ */
+angular.$sce.trustAsHtml = function(trustedValue) {};
+
+/**
+ * @param {string} trustedValue
+ * @return {*}
+ */
+angular.$sce.trustAsCss = function(trustedValue) {};
+
+/**
+ * @param {string} trustedValue
+ * @return {*}
+ */
+angular.$sce.trustAsUrl = function(trustedValue) {};
+
+/**
+ * @param {string} trustedValue
+ * @return {*}
+ */
+angular.$sce.trustAsJs = function(trustedValue) {};
+
+/**
+ * @param {string} trustedValue
+ * @return {*}
+ */
+angular.$sce.trustAsResourceUrl = function(trustedValue) {};
+
 
 /******************************************************************************
  * $timeout Service

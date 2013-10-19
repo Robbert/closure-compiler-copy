@@ -213,18 +213,26 @@ public class CommandLineRunnerTest extends TestCase {
 
   public void testInlineVariables() {
     args.add("--compilation_level=ADVANCED_OPTIMIZATIONS");
+    // Verify local var "val" in method "bar" is not inlined over the "inc"
+    // method call (which has side-effects) but "c" is inlined (which can't be
+    // modified by the call).
     test(
         "/** @constructor */ function F() { this.a = 0; }" +
         "F.prototype.inc = function() { this.a++; return 10; };" +
         "F.prototype.bar = function() { " +
-        "  var c = 3; var val = inc(); this.a += val + c;" +
+        "  var c = 3; var val = this.inc(); this.a += val + c;" +
         "};" +
         "window['f'] = new F();" +
-        "window['f']['bar'] = window['f'].bar;",
+        "window['f']['inc'] = window['f'].inc;" +
+        "window['f']['bar'] = window['f'].bar;" +
+        "use(window['f'].a)",
         "function a(){ this.a = 0; }" +
-        "a.prototype.b = function(){ var b=inc(); this.a += b + 3; };" +
+        "a.prototype.b = function(){ this.a++; return 10; };" +
+        "a.prototype.c = function(){ var b=this.b(); this.a += b + 3; };" +
         "window.f = new a;" +
-        "window.f.bar = window.f.b");
+        "window.f.inc = window.f.b;" +
+        "window.f.bar = window.f.c;" +
+        "use(window.f.a);");
   }
 
   public void testTypedAdvanced() {
@@ -282,7 +290,7 @@ public class CommandLineRunnerTest extends TestCase {
   public void testCheckSymbolsOnForVerbose() {
     args.add("--warning_level=VERBOSE");
     test("x = 3;", VarCheck.UNDEFINED_VAR_ERROR);
-    test("var y; var y;", SyntacticScopeCreator.VAR_MULTIPLY_DECLARED_ERROR);
+    test("var y; var y;", VarCheck.VAR_MULTIPLY_DECLARED_ERROR);
   }
 
   public void testCheckSymbolsOverrideForVerbose() {
@@ -435,11 +443,11 @@ public class CommandLineRunnerTest extends TestCase {
     args.add("--compilation_level=SIMPLE_OPTIMIZATIONS");
     test("function f(p) {" +
          " var x;" +
-         " return ((x=p.id) && (x=parseInt(x.substr(1))) && x>0);" +
+         " return ((x=p.id) && (x=parseInt(x.substr(1)))) && x>0;" +
          "}",
          "function f(b) {" +
          " var a;" +
-         " return ((a=b.id) && (a=parseInt(a.substr(1))) && 0<a);" +
+         " return ((a=b.id) && (a=parseInt(a.substr(1)))) && 0<a;" +
          "}");
   }
 
@@ -477,6 +485,31 @@ public class CommandLineRunnerTest extends TestCase {
     args.add("--compilation_level=ADVANCED_OPTIMIZATIONS");
     testSame(
         "try { new Function('this is an error'); } catch(a) { alert('x'); }");
+  }
+
+  public void testSideEffectIntegration() {
+    args.add("--compilation_level=ADVANCED_OPTIMIZATIONS");
+    test("/** @constructor */" +
+         "var Foo = function() {};" +
+
+         "Foo.prototype.blah = function() {" +
+         "  Foo.bar_(this)" +
+         "};" +
+
+         "Foo.bar_ = function(f) {" +
+         "  f.x = 5;" +
+         "};" +
+
+         "var y = new Foo();" +
+
+         "Foo.bar_({});" +
+
+         // We used to strip this too
+         // due to bad side-effect propagation.
+         "y.blah();" +
+
+         "alert(y);",
+         "var a = new function(){}; a.a = 5; alert(a);");
   }
 
   public void testDebugFlag1() {
@@ -726,6 +759,23 @@ public class CommandLineRunnerTest extends TestCase {
          new String[] {
            "var scotch = {}, x = externVar;",
          });
+  }
+
+  public void testModuleEntryPoint() throws Exception {
+    useModules = ModulePattern.STAR;
+    args.add("--only_closure_dependencies");
+    args.add("--closure_entry_point=m1:a");
+    test(
+        new String[] {
+          "goog.provide('a');",
+          "goog.provide('b');"
+        },
+        // Check that 'b' was stripped out, and 'a' was moved to the second
+        // module (m1).
+        new String[] {
+          "",
+          "var a = {};"
+        });
   }
 
   public void testNoCompile() {
@@ -994,7 +1044,7 @@ public class CommandLineRunnerTest extends TestCase {
     args.add("--jscomp_off=externsValidation");
     args.add("--warning_level=VERBOSE");
     test("var theirVar = {}; var myVar = {}; var myVar = {};",
-         SyntacticScopeCreator.VAR_MULTIPLY_DECLARED_ERROR);
+         VarCheck.VAR_MULTIPLY_DECLARED_ERROR);
   }
 
   public void testGoogAssertStripping() {
@@ -1035,7 +1085,11 @@ public class CommandLineRunnerTest extends TestCase {
   }
 
   public void testES3ByDefault() {
-    test("var x = f.function", RhinoErrorReporter.PARSE_ERROR);
+    useStringComparison = true;
+    test(
+        "var x = f.function",
+        "var x=f[\"function\"];",
+        RhinoErrorReporter.INVALID_ES3_PROP_NAME);
   }
 
   public void testES5ChecksByDefault() {

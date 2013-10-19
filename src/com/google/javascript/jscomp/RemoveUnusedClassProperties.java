@@ -62,15 +62,16 @@ class RemoveUnusedClassProperties
           Preconditions.checkState(assign != null
               && NodeUtil.isAssignmentOp(assign)
               && assign.getFirstChild() == n);
+          compiler.reportChangeToEnclosingScope(assign);
           // 'this.x = y' to 'y'
           assign.getParent().replaceChild(assign,
               assign.getLastChild().detachFromParent());
         } else if (parent.isInc() || parent.isDec()) {
+          compiler.reportChangeToEnclosingScope(parent);
           parent.getParent().replaceChild(parent, IR.number(0));
         } else {
-          throw new IllegalStateException("unexpected: "+ parent);
+          throw new IllegalStateException("unexpected: " + parent);
         }
-        compiler.reportCodeChange();
       }
     }
   }
@@ -88,14 +89,24 @@ class RemoveUnusedClassProperties
      switch (n.getType()) {
        case Token.GETPROP: {
          String propName = n.getLastChild().getString();
-         if (inExterns || isPinningPropertyUse(n)) {
+         if (inExterns
+             || compiler.getCodingConvention().isExported(propName)
+             || isPinningPropertyUse(n)
+             || !isKnownClassProperty(n)) {
            used.add(propName);
          } else {
            // This is a definition of a property but it is only removable
            // if it is defined on "this".
-           if (n.getFirstChild().isThis()) {
-             candidates.add(n);
-           }
+           candidates.add(n);
+         }
+         break;
+       }
+
+       case Token.OBJECTLIT: {
+         // Assume any object literal definition might be a reflection on the
+         // class property.
+         for (Node c : n.children()) {
+           used.add(c.getString());
          }
          break;
        }
@@ -113,6 +124,14 @@ class RemoveUnusedClassProperties
          }
          break;
      }
+  }
+
+  private boolean isKnownClassProperty(Node n) {
+    Preconditions.checkState(n.isGetProp());
+    Node target = n.getFirstChild();
+    return target.isThis()
+        || (target.isGetProp()
+            && target.getLastChild().getString().equals("prototype"));
   }
 
   /**

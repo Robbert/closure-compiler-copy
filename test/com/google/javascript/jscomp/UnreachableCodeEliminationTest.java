@@ -30,6 +30,7 @@ public class UnreachableCodeEliminationTest extends CompilerTestCase {
 
   @Override public void setUp() throws Exception {
     super.setUp();
+    enableComputeSideEffects();
     removeNoOpStatements = true;
   }
 
@@ -285,7 +286,7 @@ public class UnreachableCodeEliminationTest extends CompilerTestCase {
   }
 
   public void testIssue4177428a() {
-    test(
+    testSame(
         "f = function() {\n" +
         "  var action;\n" +
         "  a: {\n" +
@@ -294,28 +295,15 @@ public class UnreachableCodeEliminationTest extends CompilerTestCase {
         "      proto = new Proto\n" +
         "    } finally {\n" +
         "      action = proto;\n" +
-        "      break a\n" +  // Remove this...
+        "      break a\n" +  // Keep this...
         "    }\n" +
         "  }\n" +
-        "  alert(action)\n" + // but not this.
-        "};",
-        "f = function() {\n" +
-        "  var action;\n" +
-        "  a: {\n" +
-        "    var proto = null;\n" +
-        "    try {\n" +
-        "      proto = new Proto\n" +
-        "    } finally {\n" +
-        "      action = proto;\n" +
-        "    }\n" +
-        "  }\n" +
-        "  alert(action)\n" +  // but not this.
-        "};"
-        );
+        "  alert(action)\n" + // and this.
+        "};");
   }
 
   public void testIssue4177428b() {
-    test(
+    testSame(
         "f = function() {\n" +
         "  var action;\n" +
         "  a: {\n" +
@@ -325,34 +313,17 @@ public class UnreachableCodeEliminationTest extends CompilerTestCase {
         "      proto = new Proto\n" +
         "    } finally {\n" +
         "      action = proto;\n" +
-        "      break a\n" +  // Remove this...
+        "      break a\n" +  // Keep this...
         "    }\n" +
         "    } finally {\n" +
         "    }\n" +
         "  }\n" +
-        "  alert(action)\n" + // but not this.
-        "};",
-        "f = function() {\n" +
-        "  var action;\n" +
-        "  a: {\n" +
-        "    var proto = null;\n" +
-        "    try {\n" +
-        "    try {\n" +
-        "      proto = new Proto\n" +
-        "    } finally {\n" +
-        "      action = proto;\n" +
-        "      break a\n" +  // Remove this...
-        "    }\n" +
-        "    } finally {\n" +
-        "    }\n" +
-        "  }\n" +
-        "  alert(action)\n" +  // but not this.
-        "};"
-        );
+        "  alert(action)\n" + // and this.
+        "};");
   }
 
   public void testIssue4177428c() {
-    test(
+    testSame(
         "f = function() {\n" +
         "  var action;\n" +
         "  a: {\n" +
@@ -363,32 +334,16 @@ public class UnreachableCodeEliminationTest extends CompilerTestCase {
         "      proto = new Proto\n" +
         "    } finally {\n" +
         "      action = proto;\n" +
-        "      break a\n" +  // Remove this...
+        "      break a\n" +  // Keep this...
         "    }\n" +
         "    }\n" +
         "  }\n" +
-        "  alert(action)\n" + // but not this.
-        "};",
-        "f = function() {\n" +
-        "  var action;\n" +
-        "  a: {\n" +
-        "    var proto = null;\n" +
-        "    try {\n" +
-        "    } finally {\n" +
-        "    try {\n" +
-        "      proto = new Proto\n" +
-        "    } finally {\n" +
-        "      action = proto;\n" +
-        "    }\n" +
-        "    }\n" +
-        "  }\n" +
-        "  alert(action)\n" +  // but not this.
-        "};"
-        );
+        "  alert(action)\n" + // and this.
+        "};");
   }
 
   public void testIssue4177428_continue() {
-    test(
+    testSame(
         "f = function() {\n" +
         "  var action;\n" +
         "  a: do {\n" +
@@ -397,24 +352,11 @@ public class UnreachableCodeEliminationTest extends CompilerTestCase {
         "      proto = new Proto\n" +
         "    } finally {\n" +
         "      action = proto;\n" +
-        "      continue a\n" +  // Remove this...
+        "      continue a\n" +  // Keep this...
         "    }\n" +
         "  } while(false)\n" +
-        "  alert(action)\n" + // but not this.
-        "};",
-        "f = function() {\n" +
-        "  var action;\n" +
-        "  a: do {\n" +
-        "    var proto = null;\n" +
-        "    try {\n" +
-        "      proto = new Proto\n" +
-        "    } finally {\n" +
-        "      action = proto;\n" +
-        "    }\n" +
-        "  } while (false)\n" +
-        "  alert(action)\n" +
-        "};"
-        );
+        "  alert(action)\n" + // and this.
+        "};");
   }
 
   public void testIssue4177428_return() {
@@ -427,10 +369,10 @@ public class UnreachableCodeEliminationTest extends CompilerTestCase {
         "      proto = new Proto\n" +
         "    } finally {\n" +
         "      action = proto;\n" +
-        "      return\n" +  // Remove this...
+        "      return\n" +  // Keep this...
         "    }\n" +
         "  }\n" +
-        "  alert(action)\n" + // and this.
+        "  alert(action)\n" + // and remove this.
         "};",
         "f = function() {\n" +
         "  var action;\n" +
@@ -440,6 +382,7 @@ public class UnreachableCodeEliminationTest extends CompilerTestCase {
         "      proto = new Proto\n" +
         "    } finally {\n" +
         "      action = proto;\n" +
+        "      return\n" +
         "    }\n" +
         "  }\n" +
         "};"
@@ -469,5 +412,21 @@ public class UnreachableCodeEliminationTest extends CompilerTestCase {
 
   public void testForInLoop() {
     testSame("for(var x in y) {}");
+  }
+
+  public void testDontRemoveBreakInTryFinally() throws Exception {
+    testSame("function f() {b:try{throw 9} finally {break b} return 1;}");
+  }
+
+  public void testDontRemoveBreakInTryFinallySwitch() throws Exception {
+    testSame("function f() {b:try{throw 9} finally {" +
+             "switch(x) {case 1: break b} } return 1;}");
+  }
+
+  public void testIssue1001() throws Exception {
+    test("function f(x) { x.property = 3; } f({})",
+         "function f(x) { x.property = 3; }");
+    test("function f(x) { x.property = 3; } new f({})",
+         "function f(x) { x.property = 3; }");
   }
 }

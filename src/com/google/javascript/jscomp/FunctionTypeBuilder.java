@@ -41,7 +41,9 @@ import com.google.javascript.rhino.jstype.FunctionType;
 import com.google.javascript.rhino.jstype.JSType;
 import com.google.javascript.rhino.jstype.JSTypeRegistry;
 import com.google.javascript.rhino.jstype.ObjectType;
+import com.google.javascript.rhino.jstype.TemplateType;
 
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -88,7 +90,10 @@ final class FunctionTypeBuilder {
   private boolean makesDicts = false;
   private boolean isInterface = false;
   private Node parametersNode = null;
-  private ImmutableList<String> templateTypeNames = ImmutableList.of();
+  private ImmutableList<TemplateType> templateTypeNames = ImmutableList.of();
+  // TODO(johnlenz): verify we want both template and class template lists instead of a unified
+  // list.
+  private ImmutableList<TemplateType> classTemplateTypeNames = ImmutableList.of();
 
   static final DiagnosticType EXTENDS_WITHOUT_TYPEDEF = DiagnosticType.warning(
       "JSC_EXTENDS_WITHOUT_TYPEDEF",
@@ -142,6 +147,12 @@ final class FunctionTypeBuilder {
           "JSC_THIS_TYPE_NON_OBJECT",
           "@this type of a function must be an object\n" +
           "Actual type: {0}");
+
+  static final DiagnosticType SAME_INTERFACE_MULTIPLE_IMPLEMENTS =
+      DiagnosticType.warning(
+          "JSC_SAME_INTERFACE_MULTIPLE_IMPLEMENTS",
+          "Cannot @implement the same interface more than once\n" +
+          "Repeated interface: {0}");
 
   private class ExtendedTypeValidator implements Predicate<JSType> {
     @Override
@@ -241,6 +252,9 @@ final class FunctionTypeBuilder {
       return this;
     }
 
+    // Propagate the template types, if they exist.
+    templateTypeNames = oldType.getTemplateTypeMap().getTemplateKeys();
+
     returnType = oldType.getReturnType();
     returnTypeInferred = oldType.isReturnTypeInferred();
     if (paramsParent == null) {
@@ -297,11 +311,18 @@ final class FunctionTypeBuilder {
 
   /**
    * Infer the return type from JSDocInfo.
+   * @param fromInlineDoc Indicates whether return type is inferred from inline
+   * doc attached to function name
    */
-  FunctionTypeBuilder inferReturnType(@Nullable JSDocInfo info) {
-    if (info != null && info.hasReturnType()) {
-      returnType = info.getReturnType().evaluate(scope, typeRegistry);
-      returnTypeInferred = false;
+  FunctionTypeBuilder inferReturnType(
+      @Nullable JSDocInfo info, boolean fromInlineDoc) {
+    if (info != null) {
+      JSTypeExpression returnTypeExpr =
+          fromInlineDoc ? info.getType() : info.getReturnType();
+      if (returnTypeExpr != null) {
+        returnType = returnTypeExpr.evaluate(scope, typeRegistry);
+        returnTypeInferred = false;
+      }
     }
 
     return this;
@@ -324,6 +345,20 @@ final class FunctionTypeBuilder {
         reportWarning(CONSTRUCTOR_REQUIRED, "@dict", formatFnName());
       }
 
+      // Class template types, which can be used in the scope of a constructor
+      // definition.
+      ImmutableList<String> typeParameters = info.getTemplateTypeNames();
+      if (!typeParameters.isEmpty()) {
+        if (isConstructor || isInterface) {
+          ImmutableList.Builder<TemplateType> builder = ImmutableList.builder();
+          for (String typeParameter : typeParameters) {
+            builder.add(typeRegistry.createTemplateType(typeParameter));
+          }
+          classTemplateTypeNames = builder.build();
+          typeRegistry.setTemplateTypeNames(classTemplateTypeNames);
+        }
+      }
+
       // base type
       if (info.hasBaseType()) {
         if (isConstructor) {
@@ -342,10 +377,26 @@ final class FunctionTypeBuilder {
       if (info.getImplementedInterfaceCount() > 0) {
         if (isConstructor) {
           implementedInterfaces = Lists.newArrayList();
+          Set<JSType> baseInterfaces = new HashSet<JSType>();
           for (JSTypeExpression t : info.getImplementedInterfaces()) {
             JSType maybeInterType = t.evaluate(scope, typeRegistry);
+
             if (maybeInterType != null &&
                 maybeInterType.setValidator(new ImplementedTypeValidator())) {
+              // Disallow implementing the same base (not templatized) interface
+              // type more than once.
+              JSType baseInterface = maybeInterType;
+              if (baseInterface.toMaybeTemplatizedType() != null) {
+                baseInterface =
+                    baseInterface.toMaybeTemplatizedType().getReferencedType();
+              }
+              if (baseInterfaces.contains(baseInterface)) {
+                reportWarning(SAME_INTERFACE_MULTIPLE_IMPLEMENTS,
+                              baseInterface.toString());
+              } else {
+                baseInterfaces.add(baseInterface);
+              }
+
               implementedInterfaces.add((ObjectType) maybeInterType);
             }
           }
@@ -533,10 +584,32 @@ final class FunctionTypeBuilder {
   /**
    * Infer the template type from the doc info.
    */
-  FunctionTypeBuilder inferTemplateTypeName(@Nullable JSDocInfo info) {
-    if (info != null) {
-      templateTypeNames = info.getTemplateTypeNames();
-      typeRegistry.setTemplateTypeNames(templateTypeNames);
+  FunctionTypeBuilder inferTemplateTypeName(
+      @Nullable JSDocInfo info, JSType ownerType) {
+    // NOTE: these template type names may override a list
+    // of inherited ones from an overridden function.
+    if (info != null &&  !info.getTemplateTypeNames().isEmpty()) {
+      ImmutableList.Builder<TemplateType> builder = ImmutableList.builder();
+      for (String key : info.getTemplateTypeNames()) {
+        builder.add(typeRegistry.createTemplateType(key));
+      }
+      templateTypeNames = builder.build();
+    }
+
+    ImmutableList<TemplateType> keys = templateTypeNames;
+    if (ownerType != null) {
+      ImmutableList<TemplateType> ownerTypeKeys =
+          ownerType.getTemplateTypeMap().getTemplateKeys();
+      if (!ownerTypeKeys.isEmpty()) {
+        ImmutableList.Builder<TemplateType> builder = ImmutableList.builder();
+        builder.addAll(templateTypeNames);
+        builder.addAll(ownerTypeKeys);
+        keys = builder.build();
+      }
+    }
+
+    if (!keys.isEmpty()) {
+      typeRegistry.setTemplateTypeNames(keys);
     }
     return this;
   }
@@ -620,7 +693,7 @@ final class FunctionTypeBuilder {
       fnType = getOrCreateConstructor();
     } else if (isInterface) {
       fnType = typeRegistry.createInterfaceType(
-          fnName, contents.getSourceNode());
+          fnName, contents.getSourceNode(), classTemplateTypeNames);
       if (getScopeDeclaredIn().isGlobal() && !fnName.isEmpty()) {
         typeRegistry.declareType(fnName, fnType.getInstanceType());
       }
@@ -653,6 +726,7 @@ final class FunctionTypeBuilder {
   private void maybeSetBaseType(FunctionType fnType) {
     if (!fnType.isInterface() && baseType != null) {
       fnType.setPrototypeBasedOn(baseType);
+      fnType.extendTemplateTypeMapBasedOn(baseType);
     }
   }
 
@@ -671,7 +745,8 @@ final class FunctionTypeBuilder {
    */
   private FunctionType getOrCreateConstructor() {
     FunctionType fnType = typeRegistry.createConstructorType(
-        fnName, contents.getSourceNode(), parametersNode, returnType, null);
+        fnName, contents.getSourceNode(), parametersNode, returnType,
+        classTemplateTypeNames);
     JSType existingType = typeRegistry.getType(fnName);
 
     if (makesStructs) {

@@ -17,8 +17,10 @@
 package com.google.javascript.jscomp;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multiset;
 import com.google.common.collect.Sets;
 import com.google.javascript.jscomp.CompilerOptions.AliasTransformation;
 import com.google.javascript.jscomp.CompilerOptions.AliasTransformationHandler;
@@ -48,6 +50,22 @@ import javax.annotation.Nullable;
  * should become
  *
  * goog.dom.createElement(goog.dom.TagName.DIV);
+ *
+ * The advantage of using goog.scope is that the compiler will *guarantee*
+ * the anonymous function will be inlined, even if it can't prove
+ * that it's semantically correct to do so. For example, consider this case:
+ *
+ * goog.scope(function() {
+ *   goog.getBar = function () { return alias; };
+ *   ...
+ *   var alias = foo.bar;
+ * })
+ *
+ * In theory, the compiler can't inline 'alias' unless it can prove that
+ * goog.getBar is called only after 'alias' is defined.
+ *
+ * In practice, the compiler will inline 'alias' anyway, at the risk of
+ * 'fixing' bad code.
  *
  * @author robbyw@google.com (Robby Walker)
  */
@@ -86,9 +104,15 @@ class ScopedAliases implements HotSwapCompilerPass {
       "JSC_GOOG_SCOPE_ALIAS_REDEFINED",
       "The alias {0} is assigned a value more than once.");
 
+  static final DiagnosticType GOOG_SCOPE_ALIAS_CYCLE = DiagnosticType.error(
+      "JSC_GOOG_SCOPE_ALIAS_CYCLE",
+      "The aliases {0} has a cycle.");
+
   static final DiagnosticType GOOG_SCOPE_NON_ALIAS_LOCAL = DiagnosticType.error(
       "JSC_GOOG_SCOPE_NON_ALIAS_LOCAL",
       "The local variable {0} is in a goog.scope and is not an alias.");
+
+  private Multiset<String> scopedAliasNames = HashMultiset.create();
 
   ScopedAliases(AbstractCompiler compiler,
       @Nullable PreprocessorSymbolTable preprocessorSymbolTable,
@@ -111,8 +135,27 @@ class ScopedAliases implements HotSwapCompilerPass {
     if (!traversal.hasErrors()) {
 
       // Apply the aliases.
-      for (AliasUsage aliasUsage : traversal.getAliasUsages()) {
-        aliasUsage.applyAlias();
+      List<AliasUsage> aliasWorkQueue =
+          Lists.newArrayList(traversal.getAliasUsages());
+      while (!aliasWorkQueue.isEmpty()) {
+        List<AliasUsage> newQueue = Lists.newArrayList();
+        for (AliasUsage aliasUsage : aliasWorkQueue) {
+          if (aliasUsage.referencesOtherAlias()) {
+            newQueue.add(aliasUsage);
+          } else {
+            aliasUsage.applyAlias();
+          }
+        }
+
+        // Prevent an infinite loop.
+        if (newQueue.size() == aliasWorkQueue.size()) {
+          Var cycleVar = newQueue.get(0).aliasVar;
+          compiler.report(JSError.make(
+              cycleVar.getNode(), GOOG_SCOPE_ALIAS_CYCLE, cycleVar.getName()));
+          break;
+        } else {
+          aliasWorkQueue = newQueue;
+        }
       }
 
       // Remove the alias definitions.
@@ -144,46 +187,53 @@ class ScopedAliases implements HotSwapCompilerPass {
     }
   }
 
-  private interface AliasUsage {
-    public void applyAlias();
+  private abstract class AliasUsage {
+    final Var aliasVar;
+    final Node aliasReference;
+
+    AliasUsage(Var aliasVar, Node aliasReference) {
+      this.aliasVar = aliasVar;
+      this.aliasReference = aliasReference;
+    }
+
+    /** Checks to see if this references another alias. */
+    public boolean referencesOtherAlias() {
+      Node aliasDefinition = aliasVar.getInitialValue();
+      Node root = NodeUtil.getRootOfQualifiedName(aliasDefinition);
+      Var otherAliasVar = aliasVar.getScope().getOwnSlot(root.getString());
+      return otherAliasVar != null;
+    }
+
+    public abstract void applyAlias();
   }
 
-  private class AliasedNode implements AliasUsage {
-    private final Node aliasReference;
-
-    private final Node aliasDefinition;
-
-    AliasedNode(Node aliasReference, Node aliasDefinition) {
-      this.aliasReference = aliasReference;
-      this.aliasDefinition = aliasDefinition;
+  private class AliasedNode extends AliasUsage {
+    AliasedNode(Var aliasVar, Node aliasReference) {
+      super(aliasVar, aliasReference);
     }
 
     @Override
     public void applyAlias() {
+      Node aliasDefinition = aliasVar.getInitialValue();
       aliasReference.getParent().replaceChild(
           aliasReference, aliasDefinition.cloneTree());
     }
   }
 
-  private class AliasedTypeNode implements AliasUsage {
-    private final Node typeReference;
-    private final Node aliasDefinition;
-    private final String aliasName;
-
-    AliasedTypeNode(Node typeReference, Node aliasDefinition,
-        String aliasName) {
-      this.typeReference = typeReference;
-      this.aliasDefinition = aliasDefinition;
-      this.aliasName = aliasName;
+  private class AliasedTypeNode extends AliasUsage {
+    AliasedTypeNode(Var aliasVar, Node aliasReference) {
+      super(aliasVar, aliasReference);
     }
 
     @Override
     public void applyAlias() {
-      String typeName = typeReference.getString();
+      Node aliasDefinition = aliasVar.getInitialValue();
+      String aliasName = aliasVar.getName();
+      String typeName = aliasReference.getString();
       String aliasExpanded =
           Preconditions.checkNotNull(aliasDefinition.getQualifiedName());
       Preconditions.checkState(typeName.startsWith(aliasName));
-      typeReference.setString(typeName.replaceFirst(aliasName, aliasExpanded));
+      aliasReference.setString(typeName.replaceFirst(aliasName, aliasExpanded));
     }
   }
 
@@ -211,7 +261,7 @@ class ScopedAliases implements HotSwapCompilerPass {
     // normalization (before optimizations). We run it here on a limited
     // set of variables, but only as a last resort (because this will screw
     // up warning messages downstream).
-    private final Set<String> forbiddenLocals = Sets.newHashSet();
+    private final Set<String> forbiddenLocals = Sets.newHashSet("$jscomp");
     private boolean hasNamespaceShadows = false;
 
     private boolean hasErrors = false;
@@ -303,32 +353,67 @@ class ScopedAliases implements HotSwapCompilerPass {
       for (Var v : scope.getVarIterable()) {
         Node n = v.getNode();
         Node parent = n.getParent();
-        if (parent.isVar() &&
-            n.hasChildren() && n.getFirstChild().isQualifiedName()) {
-          String name = n.getString();
-          Var aliasVar = scope.getVar(name);
-          aliases.put(name, aliasVar);
-
-          String qualifiedName =
-              aliasVar.getInitialValue().getQualifiedName();
-          transformation.addAlias(name, qualifiedName);
-
-          int rootIndex = qualifiedName.indexOf(".");
-          if (rootIndex != -1) {
-            String qNameRoot = qualifiedName.substring(0, rootIndex);
-            if (!aliases.containsKey(qNameRoot)) {
-              forbiddenLocals.add(qNameRoot);
-            }
-          }
+        boolean isVar = parent.isVar();
+        if (isVar && n.getFirstChild() != null && n.getFirstChild().isQualifiedName()) {
+          recordAlias(v);
         } else if (v.isBleedingFunction()) {
           // Bleeding functions already get a BAD_PARAMETERS error, so just
           // do nothing.
         } else if (parent.getType() == Token.LP) {
           // Parameters of the scope function also get a BAD_PARAMETERS
           // error.
+        } else if (isVar) {
+          Node value = n.hasChildren() ?
+              v.getInitialValue().detachFromParent() :
+              null;
+          String name = n.getString();
+          int nameCount = scopedAliasNames.count(name);
+          scopedAliasNames.add(name);
+          String globalName =
+              "$jscomp.scope." + name + (nameCount == 0 ? "" : ("$" + nameCount));
+
+          compiler.ensureLibraryInjected("base");
+
+          // Add $jscomp.scope.name = EXPR;
+          // Make sure we copy over all the jsdoc and debug info.
+          if (value != null || v.getJSDocInfo() != null) {
+            Node newDecl = NodeUtil.newQualifiedNameNodeDeclaration(
+                compiler.getCodingConvention(),
+                globalName,
+                value,
+                v.getJSDocInfo())
+                .useSourceInfoIfMissingFromForTree(n);
+            NodeUtil.setDebugInformation(
+                newDecl.getFirstChild().getFirstChild(), n, name);
+            parent.getParent().addChildBefore(newDecl, parent);
+          }
+
+          // Rewrite "var name = EXPR;" to "var name = $jscomp.scope.name;"
+          v.getNameNode().addChildToFront(
+              NodeUtil.newQualifiedNameNode(
+                  compiler.getCodingConvention(), globalName, n, name));
+
+          recordAlias(v);
         } else {
-          // TODO(robbyw): Support using locals for private variables.
+          // Do not allow hoisted functions or other kinds of local symbols.
           report(t, n, GOOG_SCOPE_NON_ALIAS_LOCAL, n.getString());
+        }
+      }
+    }
+
+    private void recordAlias(Var aliasVar) {
+      String name = aliasVar.getName();
+      aliases.put(name, aliasVar);
+
+      String qualifiedName =
+        aliasVar.getInitialValue().getQualifiedName();
+      transformation.addAlias(name, qualifiedName);
+
+      int rootIndex = qualifiedName.indexOf(".");
+      if (rootIndex != -1) {
+        String qNameRoot = qualifiedName.substring(0, rootIndex);
+        if (!aliases.containsKey(qNameRoot)) {
+          forbiddenLocals.add(qNameRoot);
         }
       }
     }
@@ -444,8 +529,7 @@ class ScopedAliases implements HotSwapCompilerPass {
           // The node in aliasedNode (which is "g") will be replaced in the
           // changes pass above with "goog".  If we cloned here, we'd end up
           // with <code>g.dom.createElement('DIV')</code>.
-          Node aliasedNode = aliasVar.getInitialValue();
-          aliasUsages.add(new AliasedNode(n, aliasedNode));
+          aliasUsages.add(new AliasedNode(aliasVar, n));
         }
 
         JSDocInfo info = n.getJSDocInfo();
@@ -469,8 +553,7 @@ class ScopedAliases implements HotSwapCompilerPass {
         String baseName = name.substring(0, endIndex);
         Var aliasVar = aliases.get(baseName);
         if (aliasVar != null) {
-          Node aliasedNode = aliasVar.getInitialValue();
-          aliasUsages.add(new AliasedTypeNode(typeNode, aliasedNode, baseName));
+          aliasUsages.add(new AliasedTypeNode(aliasVar, typeNode));
         }
       }
 

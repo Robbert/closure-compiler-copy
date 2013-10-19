@@ -16,10 +16,12 @@
 package com.google.javascript.jscomp;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.google.javascript.jscomp.NodeTraversal.AbstractPostOrderCallback;
 import com.google.javascript.jscomp.NodeTraversal.AbstractShallowStatementCallback;
 import com.google.javascript.rhino.IR;
 import com.google.javascript.rhino.Node;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -44,28 +46,65 @@ import java.util.Set;
  *
  *
  */
-class RescopeGlobalSymbols implements CompilerPass {
+final class RescopeGlobalSymbols implements CompilerPass {
 
   // Appended to variables names that conflict with globalSymbolNamespace.
   private static final String DISAMBIGUATION_SUFFIX = "$";
   private static final String WINDOW = "window";
   private static final Set<String> SPECIAL_EXTERNS =
-      ImmutableSet.of(WINDOW, "eval", "arguments");
+      ImmutableSet.of(WINDOW, "eval", "arguments",
+          // The javascript built-in objects (listed in Ecma 262 section 4.2)
+          "Object", "Function", "Array", "String", "Boolean", "Number", "Math",
+          "Date", "RegExp", "JSON", "Error", "EvalError", "ReferenceError",
+          "SyntaxError", "TypeError", "URIError");
 
   private final AbstractCompiler compiler;
   private final String globalSymbolNamespace;
   private final boolean addExtern;
+  private final boolean assumeCrossModuleNames;
+  private final Set<String> crossModuleNames = Sets.newHashSet();
 
-  RescopeGlobalSymbols(AbstractCompiler compiler, String globalSymbolNamespace,
-      boolean addExtern) {
+  /**
+   * Constructor for the RescopeGlobalSymbols compiler pass.
+   *
+   * @param compiler The JSCompiler, for reporting code changes.
+   * @param globalSymbolNamespace Name of namespace into which all global
+   *     symbols are transferred.
+   * @param assumeCrossModuleNames If true, all global symbols will be assumed
+   *     cross module boundaries and thus require renaming.
+   */
+  RescopeGlobalSymbols(
+      AbstractCompiler compiler,
+      String globalSymbolNamespace,
+      boolean assumeCrossModuleNames) {
+    this(compiler, globalSymbolNamespace, true, assumeCrossModuleNames);
+  }
+
+  /**
+   * Constructor for the RescopeGlobalSymbols compiler pass for use in testing.
+   *
+   * @param compiler The JSCompiler, for reporting code changes.
+   * @param globalSymbolNamespace Name of namespace into which all global
+   *     symbols are transferred.
+   * @param addExtern If true, the compiler will consider the
+   *    globalSymbolNamespace an extern name.
+   * @param assumeCrossModuleNames If true, all global symbols will be assumed
+   *     cross module boundaries and thus require renaming.
+   * VisibleForTesting
+   */
+  RescopeGlobalSymbols(
+      AbstractCompiler compiler,
+      String globalSymbolNamespace,
+      boolean addExtern,
+      boolean assumeCrossModuleNames) {
     this.compiler = compiler;
     this.globalSymbolNamespace = globalSymbolNamespace;
     this.addExtern = addExtern;
+    this.assumeCrossModuleNames = assumeCrossModuleNames;
   }
 
-  RescopeGlobalSymbols(AbstractCompiler compiler,
-      String globalSymbolNamespace) {
-    this(compiler, globalSymbolNamespace, true);
+  private boolean isCrossModuleName(String name) {
+    return assumeCrossModuleNames || crossModuleNames.contains(name);
   }
 
   private void addExternForGlobalSymbolNamespace() {
@@ -84,19 +123,27 @@ class RescopeGlobalSymbols implements CompilerPass {
     }
     // Rewrite all references to global symbols to properties of a
     // single symbol by:
-    // (If necessary the 3 traversals could be combined. They are left
+    // (If necessary the 4 traversals could be combined. They are left
     // separate for readability reasons.)
     // 1. turning global named function statements into var assignments.
-    NodeTraversal.traverse(compiler, root,
+    NodeTraversal.traverse(
+        compiler,
+        root,
         new RewriteGlobalFunctionStatementsToVarAssignmentsCallback());
-    // 2. rewriting all references to be property accesses of the single symbol.
+    // 2. find global names than are used in more than one module. Those that
+    //    are have to be rewritten.
+    NodeTraversal.traverse(compiler, root, new FindCrossModuleNamesCallback());
+    // 3. rewriting all references to be property accesses of the single symbol.
     NodeTraversal.traverse(compiler, root, new RewriteScopeCallback());
-    // 3. removing the var from every statement in global scope.
+    // 4. removing the var from statements in global scope if the declared names
+    //    have been rewritten in the previous pass.
     NodeTraversal.traverse(compiler, root, new RemoveGlobalVarCallback());
 
     // Extra pass which makes all extern global symbols reference window
     // explicitly.
-    NodeTraversal.traverse(compiler, root,
+    NodeTraversal.traverse(
+        compiler,
+        root,
         new MakeExternsReferenceWindowExplicitly());
   }
 
@@ -126,6 +173,40 @@ class RescopeGlobalSymbols implements CompilerPass {
           parent.addChildAfter(var, prev);
         }
         compiler.reportCodeChange();
+      }
+    }
+  }
+
+  /**
+   * Find all global names that are used in more than one module. The following
+   * compiler transformations can ignore the globals that are not.
+   */
+  private class FindCrossModuleNamesCallback extends
+      AbstractPostOrderCallback {
+    @Override
+    public void visit(NodeTraversal t, Node n, Node parent) {
+      if (n.isName()) {
+        String name = n.getString();
+        if ("".equals(name) || crossModuleNames.contains(name)) {
+          return;
+        }
+        Scope s = t.getScope();
+        Scope.Var v = s.getVar(name);
+        if (v == null || !v.isGlobal()) {
+          return;
+        }
+        CompilerInput input = v.getInput();
+        if (input == null) {
+          // We know nothing. Assume name is used across modules.
+          crossModuleNames.add(name);
+          return;
+        }
+        // Compare the module where the variable is declared to the current
+        // module. If they are different, the variable is used across modules.
+        JSModule module = input.getModule();
+        if (module != t.getModule()) {
+          crossModuleNames.add(name);
+        }
       }
     }
   }
@@ -173,8 +254,10 @@ class RescopeGlobalSymbols implements CompilerPass {
       // add suffix to avoid shadowing the namespace. Also add a suffix
       // if a name starts with the name of the globalSymbolNamespace and
       // the suffix.
-      if (!var.isExtern() && (name.equals(globalSymbolNamespace) ||
-          name.indexOf(globalSymbolNamespace + DISAMBIGUATION_SUFFIX) == 0)) {
+      if (!var.isExtern() && !var.isGlobal()
+          && (name.equals(globalSymbolNamespace)
+              || name.startsWith(
+                  globalSymbolNamespace + DISAMBIGUATION_SUFFIX))) {
         n.setString(name + DISAMBIGUATION_SUFFIX);
         compiler.reportCodeChange();
       }
@@ -184,26 +267,62 @@ class RescopeGlobalSymbols implements CompilerPass {
       }
       Node nameNode = var.getNameNode();
       // The exception variable (e in try{}catch(e){}) should not be rewritten.
-      if (nameNode != null && nameNode.getParent() != null &&
-          nameNode.getParent().isCatch()) {
+      if (nameNode != null && nameNode.getParent() != null
+          && nameNode.getParent().isCatch()) {
         return;
       }
-      replaceSymbol(n, name);
+      replaceSymbol(n, name, t.getInput());
     }
 
-    private void replaceSymbol(Node node, String name) {
+    private void replaceSymbol(Node node, String name, CompilerInput input) {
       Node parent = node.getParent();
-      Node replacement = IR.getprop(
-          IR.name(globalSymbolNamespace).srcref(node),
-          IR.string(name).srcref(node));
+      boolean isCrossModule = isCrossModuleName(name);
+      if (!isCrossModule) {
+        // When a non cross module name appears outside a var declaration we
+        // never have to do anything.
+        if (!parent.isVar()) {
+          return;
+        }
+        // If it is a var declaration, but no cross module names are declared
+        // we also don't have to do anything.
+        boolean hasCrossModuleChildren = false;
+        for (Node c : parent.children()) {
+          // Var child is no longer a name means it was transformed already
+          // which means there was a cross module name.
+          if (!c.isName() || isCrossModuleName(c.getString())) {
+            hasCrossModuleChildren = true;
+            break;
+          }
+        }
+        if (!hasCrossModuleChildren) {
+          return;
+        }
+      }
+      Node replacement = isCrossModule
+          ? IR.getprop(
+              IR.name(globalSymbolNamespace).srcref(node),
+              IR.string(name).srcref(node))
+          : IR.name(name).srcref(node);
       replacement.srcref(node);
       if (node.hasChildren()) {
         // var declaration list: var a = 1, b = 2;
-        Node assign = IR.assign(replacement,
+        Node assign = IR.assign(
+            replacement,
             node.removeFirstChild());
         parent.replaceChild(node, assign);
-      } else {
+      } else if (isCrossModule) {
         parent.replaceChild(node, replacement);
+      }
+      // If we changed a non cross module name that was in a var declaration
+      // we need to preserve that var declaration. Because it is global
+      // anyway, we just put it at the beginning of the current input.
+      // Example:
+      // var crossModule = i++, notCrossModule = i++
+      // becomes
+      // var notCrossModule;_.crossModule = i++, notCrossModule = i++
+      if (!isCrossModule && parent.isVar()) {
+        input.getAstRoot(compiler).addChildToFront(
+            IR.var(IR.name(name).srcref(node)).srcref(node));
       }
       compiler.reportCodeChange();
     }
@@ -232,17 +351,27 @@ class RescopeGlobalSymbols implements CompilerPass {
       if (!n.isVar()) {
         return;
       }
+
       List<Node> commas = new ArrayList<Node>();
       List<Node> interestingChildren = new ArrayList<Node>();
       // Filter out declarations without assignments.
       // As opposed to regular var nodes, there are always assignments
       // because the previous traversal in RewriteScopeCallback creates
       // them.
+      boolean allName = true;
       for (Node c : n.children()) {
-        if (c.isAssign() ||
-            parent.isFor()) {
+        if (!c.isName()) {
+          allName = false;
+        }
+        if (c.isAssign() || parent.isFor()) {
           interestingChildren.add(c);
         }
+      }
+      // If every child of a var declares a name, it must stay in place.
+      // This is the case if none of the declared variables cross module
+      // boundaries.
+      if (allName) {
+        return;
       }
       for (Node c : interestingChildren) {
         if (parent.isFor() && parent.getFirstChild() == n) {
@@ -288,15 +417,16 @@ class RescopeGlobalSymbols implements CompilerPass {
         return;
       }
       String name = n.getString();
+      if (globalSymbolNamespace.equals(name)
+          || SPECIAL_EXTERNS.contains(name)) {
+        return;
+      }
       Scope.Var var = t.getScope().getVar(name);
-      if (name.length() > 0 && (var == null || var.isExtern()) &&
-          !globalSymbolNamespace.equals(name) &&
-          !SPECIAL_EXTERNS.contains(name)) {
+      if (name.length() > 0 && (var == null || var.isExtern())) {
         parent.replaceChild(n, IR.getprop(IR.name(WINDOW), IR.string(name))
             .srcrefTree(n));
         compiler.reportCodeChange();
       }
     }
-
   }
 }

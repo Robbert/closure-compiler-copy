@@ -33,8 +33,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-
-
 /**
  * Inlines functions that are divided into two types: "direct call node
  * replacement" (aka "direct") and as a block of statements (aka block).
@@ -639,8 +637,8 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
       String fnName = fn.getName();
       Node fnNode = fs.getSafeFnNode();
 
+      t.getCompiler().reportChangeToEnclosingScope(callNode);
       injector.inline(callNode, fnName, fnNode, mode);
-      t.getCompiler().reportCodeChange();
       t.getCompiler().addToDebugLog("Inlined function: " + fn.getName());
     }
   }
@@ -829,7 +827,6 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
         }
 
         fn.remove();
-        compiler.reportCodeChange();
       }
     }
   }
@@ -1014,7 +1011,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
   }
 
   /** NamedFunction implementation of the Function interface */
-  private static class NamedFunction implements Function {
+  private class NamedFunction implements Function {
     private final Node fn;
 
     public NamedFunction(Node fn) {
@@ -1033,6 +1030,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
 
     @Override
     public void remove() {
+      compiler.reportChangeToEnclosingScope(fn);
       NodeUtil.removeChild(fn.getParent(), fn);
     }
 
@@ -1043,7 +1041,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
   }
 
   /** FunctionVar implementation of the Function interface */
-  private static class FunctionVar implements Function {
+  private class FunctionVar implements Function {
     private final Node var;
 
     public FunctionVar(Node var) {
@@ -1062,6 +1060,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
 
     @Override
     public void remove() {
+      compiler.reportChangeToEnclosingScope(var);
       NodeUtil.removeChild(var.getParent(), var);
     }
 
@@ -1072,7 +1071,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
   }
 
   /** FunctionExpression implementation of the Function interface */
-  private static class FunctionExpression implements Function {
+  private class FunctionExpression implements Function {
     private final Node fn;
     private final String fakeName;
 

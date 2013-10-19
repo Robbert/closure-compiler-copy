@@ -95,7 +95,9 @@ public class ClosureCodingConvention extends CodingConventions.Proxy {
   public SubclassRelationship getClassesDefinedByCall(Node callNode) {
     SubclassRelationship relationship =
         super.getClassesDefinedByCall(callNode);
-    if (relationship != null) return relationship;
+    if (relationship != null) {
+      return relationship;
+    }
 
     Node callName = callNode.getFirstChild();
     SubclassType type = typeofClassDefiningName(callName);
@@ -378,6 +380,7 @@ public class ClosureCodingConvention extends CodingConventions.Proxy {
             JSTypeNative.OBJECT_TYPE),
         new AssertionFunctionSpec("goog.asserts.assertArray",
             JSTypeNative.ARRAY_TYPE),
+        new AssertFunctionByTypeName("goog.asserts.assertElement", "Element"),
         new AssertInstanceofSpec("goog.asserts.assertInstanceof")
     );
   }
@@ -466,5 +469,23 @@ public class ClosureCodingConvention extends CodingConventions.Proxy {
     }
   }
 
+  /**
+   * A function that will throw an exception when the value is not an
+   * instanceof the given type name, for instance "Element".
+   */
+  public static class AssertFunctionByTypeName extends AssertionFunctionSpec {
+    private final String typeName;
+
+    public AssertFunctionByTypeName(String functionName, String typeName) {
+      super(functionName);
+      this.typeName = typeName;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public JSType getAssertedType(Node call, JSTypeRegistry registry) {
+      return registry.getType(typeName);
+    }
+  }
 
 }

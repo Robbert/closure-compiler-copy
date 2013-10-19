@@ -19,7 +19,6 @@ package com.google.javascript.jscomp;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.javascript.jscomp.NodeTraversal.AbstractPostOrderCallback;
-
 import com.google.javascript.rhino.IR;
 import com.google.javascript.rhino.JSDocInfo;
 import com.google.javascript.rhino.Node;
@@ -73,7 +72,7 @@ class AngularPass extends AbstractPostOrderCallback implements CompilerPass {
   final AbstractCompiler compiler;
 
   /** Nodes annotated with @ngInject */
-  private List<NodeContext> injectables = new ArrayList<NodeContext>();
+  private final List<NodeContext> injectables = new ArrayList<NodeContext>();
 
   public AngularPass(AbstractCompiler compiler) {
     this.compiler = compiler;
@@ -115,14 +114,25 @@ class AngularPass extends AbstractPostOrderCallback implements CompilerPass {
       // creates `something.$inject = ['param1', 'param2']` node.
       Node statement = IR.exprResult(
           IR.assign(
-              NodeUtil.newQualifiedNameNode(convention,
-                  name + "." + INJECT_PROPERTY_NAME),
+              IR.getelem(
+                  NodeUtil.newQualifiedNameNode(convention, name),
+                  IR.string(INJECT_PROPERTY_NAME)),
               dependenciesArray
           )
       );
-      // adds `something.$inject = [...]` node after the annotated node.
-      Node target = entry.getTarget();
-      target.getParent().addChildAfter(statement, target);
+      // adds `something.$inject = [...]` node after the annotated node or the following
+      // goog.inherits call.
+      Node insertionPoint = entry.getTarget();
+      Node next = insertionPoint.getNext();
+      while (next != null &&
+             NodeUtil.isExprCall(next) &&
+             convention.getClassesDefinedByCall(
+                 next.getFirstChild()) != null) {
+        insertionPoint = next;
+        next = insertionPoint.getNext();
+      }
+
+      insertionPoint.getParent().addChildAfter(statement, insertionPoint);
       codeChanged = true;
     }
     if (codeChanged) {
@@ -136,7 +146,7 @@ class AngularPass extends AbstractPostOrderCallback implements CompilerPass {
    * @param n the FUNCTION node.
    * @return STRING nodes.
    */
-  private List<Node> createDependenciesList(Node n) {
+  private static List<Node> createDependenciesList(Node n) {
     Preconditions.checkArgument(n.isFunction());
     Node params = NodeUtil.getFunctionParameters(n);
     if (params != null) {
@@ -150,7 +160,7 @@ class AngularPass extends AbstractPostOrderCallback implements CompilerPass {
    * @param params PARAM_LIST node.
    * @return array of STRING nodes.
    */
-  private List<Node> createStringsFromParamList(Node params) {
+  private static List<Node> createStringsFromParamList(Node params) {
     Node param = params.getFirstChild();
     ArrayList<Node> names = Lists.newArrayList();
     while (param != null && param.isName()) {
@@ -210,14 +220,14 @@ class AngularPass extends AbstractPostOrderCallback implements CompilerPass {
         target = n;
         break;
     }
-    // checks that the declaration took place in a block or in a global scope.
-    if (!target.getParent().isScript() && !target.getParent().isBlock()) {
-      compiler.report(t.makeError(n, INJECT_IN_NON_GLOBAL_OR_BLOCK_ERROR));
-      return;
-    }
     // checks that it is a function declaration.
     if (fn == null || !fn.isFunction()) {
       compiler.report(t.makeError(n, INJECT_NON_FUNCTION_ERROR));
+      return;
+    }
+    // checks that the declaration took place in a block or in a global scope.
+    if (!target.getParent().isScript() && !target.getParent().isBlock()) {
+      compiler.report(t.makeError(n, INJECT_IN_NON_GLOBAL_OR_BLOCK_ERROR));
       return;
     }
     // checks that name is present, which must always be the case unless the
@@ -240,7 +250,7 @@ class AngularPass extends AbstractPostOrderCallback implements CompilerPass {
    * @return the assigned intial value, or the rightmost rvalue of an assignment
    * chain, or null.
    */
-  private Node getDeclarationRValue(Node n) {
+  private static Node getDeclarationRValue(Node n) {
     Preconditions.checkNotNull(n);
     Preconditions.checkArgument(n.isVar());
     n = n.getFirstChild().getFirstChild();
@@ -255,13 +265,13 @@ class AngularPass extends AbstractPostOrderCallback implements CompilerPass {
 
   class NodeContext {
     /** Name of the function/object. */
-    private String name;
+    private final String name;
     /** Node jsDoc is attached to. */
-    private Node node;
+    private final Node node;
     /** Function node */
-    private Node functionNode;
+    private final Node functionNode;
     /** Node after which to inject the new code */
-    private Node target;
+    private final Node target;
 
     public NodeContext(String name, Node node, Node functionNode, Node target) {
       this.name = name;

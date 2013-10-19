@@ -727,7 +727,7 @@ jQuery.prototype.die = function(arg1, handler) {};
 
 /**
  * @param {Object} collection
- * @param {function(number,?)} callback
+ * @param {function((number|string),?)} callback
  * @return {Object}
  */
 jQuery.each = function(collection, callback) {};
@@ -740,7 +740,7 @@ jQuery.prototype.each = function(fnc) {};
 
 /**
  * @param {Object} collection
- * @param {function(number,?)} callback
+ * @param {function((number|string),?)} callback
  * @return {Object}
  */
 $.each = function(collection, callback) {};
@@ -1823,7 +1823,7 @@ jQuery.Promise.prototype.then =
 /**
  * @param {(string|Object.<string,*>)} arg1
  * @param {(string|number|boolean|function(number,String))=} arg2
- * @return {(string|!jQuery)}
+ * @return {(string|boolean|!jQuery)}
  */
 jQuery.prototype.prop = function(arg1, arg2) {};
 
@@ -2006,28 +2006,31 @@ jQuery.prototype.size = function() {};
 jQuery.prototype.slice = function(start, end) {};
 
 /**
- * @param {(string|number|function())=} duration
- * @param {(function()|string)=} arg2
- * @param {function()=} callback
+ * @param {(Object.<string,*>|string|number)=} optionsOrDuration
+ * @param {(function()|string)=} completeOrEasing
+ * @param {function()=} complete
  * @return {!jQuery}
  */
-jQuery.prototype.slideDown = function(duration, arg2, callback) {};
+jQuery.prototype.slideDown =
+    function(optionsOrDuration, completeOrEasing, complete) {};
 
 /**
- * @param {(string|number|function())=} duration
- * @param {(function()|string)=} arg2
- * @param {function()=} callback
+ * @param {(Object.<string,*>|string|number)=} optionsOrDuration
+ * @param {(function()|string)=} completeOrEasing
+ * @param {function()=} complete
  * @return {!jQuery}
  */
-jQuery.prototype.slideToggle = function(duration, arg2, callback) {};
+jQuery.prototype.slideToggle =
+    function(optionsOrDuration, completeOrEasing, complete) {};
 
 /**
- * @param {(string|number|function())=} duration
- * @param {(function()|string)=} arg2
- * @param {function()=} callback
+ * @param {(Object.<string,*>|string|number)=} optionsOrDuration
+ * @param {(function()|string)=} completeOrEasing
+ * @param {function()=} complete
  * @return {!jQuery}
  */
-jQuery.prototype.slideUp = function(duration, arg2, callback) {};
+jQuery.prototype.slideUp =
+    function(optionsOrDuration, completeOrEasing, complete) {};
 
 /**
  * @param {(boolean|string)=} arg1

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010 Closure Compiler Authors
+ * Copyright 2010 The Closure Compiler Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,9 @@
  * This file is current up to the WebGL 1.0.1 spec, including extensions.
  *
  * This relies on html5.js being included for Canvas and Typed Array support.
+ *
+ * This includes some extensions defined at
+ * http://www.khronos.org/registry/webgl/extensions/
  *
  * @externs
  */
@@ -2832,11 +2835,12 @@ WebGLContextAttributes.prototype.preserveDrawingBuffer;
 
 
 /**
+ * @param {string} eventType
  * @constructor
  * @noalias
  * @extends {Event}
  */
-function WebGLContextEvent() {}
+function WebGLContextEvent(eventType) {}
 
 /**
  * @type {string}
@@ -3107,3 +3111,46 @@ EXT_texture_filter_anisotropic.prototype.TEXTURE_MAX_ANISOTROPY_EXT;
 
 /** @type {number} */
 EXT_texture_filter_anisotropic.prototype.MAX_TEXTURE_MAX_ANISOTROPY_EXT;
+
+
+
+/**
+ * @see http://www.khronos.org/registry/webgl/extensions/ANGLE_instanced_arrays/
+ * @constructor
+ * @noalias
+ */
+function ANGLE_instanced_arrays() {}
+
+
+/** @type {number} */
+ANGLE_instanced_arrays.prototype.VERTEX_ATTRIB_ARRAY_DIVISOR_ANGLE;
+
+
+/**
+ * @param {number} mode Primitive type.
+ * @param {number} first First vertex.
+ * @param {number} count Number of vertices per instance.
+ * @param {number} primcount Number of instances.
+ */
+ANGLE_instanced_arrays.prototype.drawArraysInstancedANGLE = function(
+    mode, first, count, primcount) {};
+
+
+/**
+ * @param {number} mode Primitive type.
+ * @param {number} count Number of vertex indices per instance.
+ * @param {number} type Type of a vertex index.
+ * @param {number} offset Offset to the first vertex index.
+ * @param {number} primcount Number of instances.
+ */
+ANGLE_instanced_arrays.prototype.drawElementsInstancedANGLE = function(
+    mode, count, type, offset, primcount) {};
+
+
+/**
+ * @param {number} index Attribute index.
+ * @param {number} divisor Instance divisor.
+ */
+ANGLE_instanced_arrays.prototype.vertexAttribDivisorANGLE = function(
+    index, divisor) {};
+

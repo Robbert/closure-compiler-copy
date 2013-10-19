@@ -19,16 +19,16 @@ package com.google.javascript.jscomp;
 import com.google.common.collect.Sets;
 import com.google.javascript.jscomp.NameReferenceGraph.Name;
 import com.google.javascript.jscomp.NameReferenceGraph.Reference;
-import com.google.javascript.jscomp.graph.FixedPointGraphTraversal;
 import com.google.javascript.jscomp.graph.Annotation;
-import com.google.javascript.jscomp.graph.GraphNode;
+import com.google.javascript.jscomp.graph.FixedPointGraphTraversal;
 import com.google.javascript.jscomp.graph.FixedPointGraphTraversal.EdgeCallback;
+import com.google.javascript.jscomp.graph.GraphNode;
 import com.google.javascript.rhino.Node;
 
 /**
  * Analyzes names and references usage by determining:
  * <p><ol>
- * <li>If the name is reachable from the {@link NameReferenceGraph#MAIN}.</li>
+ * <li>If the name is reachable from the {@link NameReferenceGraph#main}.</li>
  * <li>as well as the deepest common module that references it.</li>
  * </ol>
  *
@@ -58,8 +58,8 @@ class AnalyzeNameReferences implements CompilerPass {
     graph = gc.getNameReferenceGraph();
     FixedPointGraphTraversal<Name, Reference> t =
         FixedPointGraphTraversal.newTraversal(new PropagateReferences());
-    getInfo(graph.MAIN).markReference(null);
-    t.computeFixedPoint(graph, Sets.newHashSet(graph.MAIN));
+    getInfo(graph.main).markReference(null);
+    t.computeFixedPoint(graph, Sets.newHashSet(graph.main));
   }
 
   public NameReferenceGraph getGraph() {

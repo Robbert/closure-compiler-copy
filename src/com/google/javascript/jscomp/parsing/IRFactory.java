@@ -24,6 +24,7 @@ import com.google.javascript.rhino.IR;
 import com.google.javascript.rhino.JSDocInfo;
 import com.google.javascript.rhino.Node;
 import com.google.javascript.rhino.Token;
+import com.google.javascript.rhino.TokenStream;
 import com.google.javascript.rhino.head.ErrorReporter;
 import com.google.javascript.rhino.head.Token.CommentType;
 import com.google.javascript.rhino.head.ast.ArrayLiteral;
@@ -73,6 +74,7 @@ import com.google.javascript.rhino.head.ast.WithStatement;
 import com.google.javascript.rhino.jstype.StaticSourceFile;
 
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * IRFactory transforms the new AST to the old AST.
@@ -81,13 +83,13 @@ import java.util.Set;
 class IRFactory {
 
   static final String GETTER_ERROR_MESSAGE =
-      "getters are not supported in older versions of JS. " +
-      "If you are targeting newer versions of JS, " +
+      "getters are not supported in older versions of JavaScript. " +
+      "If you are targeting newer versions of JavaScript, " +
       "set the appropriate language_in option.";
 
   static final String SETTER_ERROR_MESSAGE =
-      "setters are not supported in older versions of JS. " +
-      "If you are targeting newer versions of JS, " +
+      "setters are not supported in older versions of JavaScript. " +
+      "If you are targeting newer versions of JavaScript, " +
       "set the appropriate language_in option.";
 
   static final String SUSPICIOUS_COMMENT_WARNING =
@@ -96,6 +98,12 @@ class IRFactory {
 
   static final String MISPLACED_TYPE_ANNOTATION =
       "Type annotations are not allowed here. Are you missing parentheses?";
+
+  static final String INVALID_ES3_PROP_NAME =
+      "Keywords and reserved words are not allowed as unquoted property " +
+      "names in older versions of JavaScript. " +
+      "If you are targeting newer versions of JavaScript, " +
+      "set the appropriate language_in option.";
 
   private final String sourceString;
   private final StaticSourceFile sourceFile;
@@ -130,7 +138,7 @@ class IRFactory {
 
   // Use a template node for properties set on all nodes to minimize the
   // memory footprint associated with these.
-  private Node templateNode;
+  private final Node templateNode;
 
   // TODO(johnlenz): Consider creating a template pool for ORIGINALNAME_PROP.
 
@@ -152,8 +160,7 @@ class IRFactory {
 
     switch (config.languageMode) {
       case ECMASCRIPT3:
-        // Reserved words are handled by the Rhino parser.
-        reservedKeywords = null;
+        reservedKeywords = null; // use TokenStream.isKeyword instead
         break;
       case ECMASCRIPT5:
         reservedKeywords = ES5_RESERVED_KEYWORDS;
@@ -242,9 +249,8 @@ class IRFactory {
    * Check to see if the given block comment looks like it should be JSDoc.
    */
   private void handleBlockComment(Comment comment) {
-    String value = comment.getValue();
-    if (value.indexOf("/* @") != -1 ||
-        value.indexOf("\n * @") != -1) {
+    Pattern p = Pattern.compile("(/|(\n[ \t]*))\\*[ \t]*@[a-zA-Z]+[ \t\n{]");
+    if (p.matcher(comment.getValue()).find()) {
       errorReporter.warning(
           SUSPICIOUS_COMMENT_WARNING,
           sourceName,
@@ -300,14 +306,18 @@ class IRFactory {
           break;
         // Function declarations are valid
         case com.google.javascript.rhino.head.Token.FUNCTION:
-          FunctionNode fnNode = (FunctionNode)node;
+          FunctionNode fnNode = (FunctionNode) node;
           valid = fnNode.getFunctionType() == FunctionNode.FUNCTION_STATEMENT;
           break;
-        // Object literal properties and catch declarations are valid.
+        // Object literal properties, catch declarations and variable
+        // initializers are valid.
         case com.google.javascript.rhino.head.Token.NAME:
-          valid = node.getParent() instanceof ObjectProperty
-              || node.getParent() instanceof CatchClause
-              || node.getParent() instanceof FunctionNode;
+          AstNode parent = node.getParent();
+          valid = parent instanceof ObjectProperty
+              || parent instanceof CatchClause
+              || parent instanceof FunctionNode
+              || (parent instanceof VariableInitializer &&
+                  node == ((VariableInitializer) parent).getTarget());
           break;
         // Object literal properties are valid
         case com.google.javascript.rhino.head.Token.GET:
@@ -321,7 +331,7 @@ class IRFactory {
         case com.google.javascript.rhino.head.Token.ASSIGN:
           if (node instanceof Assignment) {
             valid = isExprStmt(node.getParent())
-                && isPropAccess(((Assignment)node).getLeft());
+                && isPropAccess(((Assignment) node).getLeft());
           }
           break;
 
@@ -329,6 +339,10 @@ class IRFactory {
         case com.google.javascript.rhino.head.Token.GETPROP:
         case com.google.javascript.rhino.head.Token.GETELEM:
           valid = isExprStmt(node.getParent());
+          break;
+
+        case com.google.javascript.rhino.head.Token.CALL:
+          valid = info.isDefine();
           break;
       }
       if (!valid) {
@@ -339,12 +353,12 @@ class IRFactory {
     }
   }
 
-  private boolean isPropAccess(AstNode node) {
+  private static boolean isPropAccess(AstNode node) {
     return node.getType() == com.google.javascript.rhino.head.Token.GETPROP
         || node.getType() == com.google.javascript.rhino.head.Token.GETELEM;
   }
 
-  private boolean isExprStmt(AstNode node) {
+  private static boolean isExprStmt(AstNode node) {
     return node.getType() == com.google.javascript.rhino.head.Token.EXPR_RESULT
         || node.getType() == com.google.javascript.rhino.head.Token.EXPR_VOID;
   }
@@ -363,24 +377,23 @@ class IRFactory {
   private Node maybeInjectCastNode(AstNode node, JSDocInfo info, Node irNode) {
     if (node.getType() == com.google.javascript.rhino.head.Token.LP
         && node instanceof ParenthesizedExpression
-        && info.hasType()
-        // TODO(johnlenz): for now, attach object literal type directly.
-        && !irNode.isObjectLit()) {
+        && info.hasType()) {
       irNode = newNode(Token.CAST, irNode);
     }
     return irNode;
   }
 
   /**
-   * Parameter NAMEs are special, because they can have inline type docs
-   * attached.
+   * NAMEs in parameters or variable declarations are special, because they can
+   * have inline type docs attached.
    *
    * function f(/** string &#42;/ x) {}
    * annotates 'x' as a string.
    *
-   * @see http://code.google.com/p/jsdoc-toolkit/wiki/InlineDocs
+   * @see <a href="http://code.google.com/p/jsdoc-toolkit/wiki/InlineDocs">
+   *   Using Inline Doc Comments</a>
    */
-  private Node transformParameter(AstNode node) {
+  private Node transformNodeWithInlineJsDoc(AstNode node) {
     Node irNode = justTransform(node);
     Comment comment = node.getJsDocNode();
     if (comment != null) {
@@ -518,7 +531,7 @@ class IRFactory {
         com.google.javascript.rhino.head.Node n) {
       Node node = newNode(transformTokenType(n.getType()));
       for (com.google.javascript.rhino.head.Node child : n) {
-        node.addChildToBack(transform((AstNode)child));
+        node.addChildToBack(transform((AstNode) child));
       }
       return node;
     }
@@ -535,9 +548,9 @@ class IRFactory {
     private Node transformAsString(AstNode n) {
       Node ret;
       if (n instanceof Name) {
-        ret = transformNameAsString((Name)n);
+        ret = transformNameAsString((Name) n);
       } else if (n instanceof NumberLiteral) {
-        ret = transformNumberAsString((NumberLiteral)n);
+        ret = transformNumberAsString((NumberLiteral) n);
         ret.putBooleanProp(Node.QUOTED_PROP, true);
       } else {
         ret = transform(n);
@@ -578,7 +591,7 @@ class IRFactory {
     Node processAstRoot(AstRoot rootNode) {
       Node node = newNode(Token.SCRIPT);
       for (com.google.javascript.rhino.head.Node child : rootNode) {
-        node.addChildToBack(transform((AstNode)child));
+        node.addChildToBack(transform((AstNode) child));
       }
       parseDirectives(node);
       return node;
@@ -611,8 +624,9 @@ class IRFactory {
     }
 
     private boolean isDirective(Node n) {
-      if (n == null) return false;
-
+      if (n == null) {
+        return false;
+      }
       int nType = n.getType();
       return nType == Token.EXPR_RESULT &&
           n.getFirstChild().isString() &&
@@ -769,7 +783,8 @@ class IRFactory {
         isUnnamedFunction = true;
       }
       Node node = newNode(Token.FUNCTION);
-      Node newName = transform(name);
+      // if the function has an inline return annotation, attach it
+      Node newName = transformNodeWithInlineJsDoc(name);
       if (isUnnamedFunction) {
         // Old Rhino tagged the empty name node with the line number of the
         // declaration.
@@ -802,7 +817,7 @@ class IRFactory {
 
       lp.setCharno(position2charno(lparenCharno));
       for (AstNode param : functionNode.getParams()) {
-        Node paramNode = transformParameter(param);
+        Node paramNode = transformNodeWithInlineJsDoc(param);
         // When in ideMode Rhino can generate a param list with only a single
         // ErrorNode. This is transformed into an EMPTY node. Drop this node in
         // ideMode to keep the AST in a valid state.
@@ -910,10 +925,17 @@ class IRFactory {
       }
     }
 
-    /**
-     * @return Whether the
-     */
+    private boolean isAllowedProp(String identifier) {
+      if (config.languageMode == LanguageMode.ECMASCRIPT3) {
+        return !TokenStream.isKeyword(identifier);
+      }
+      return true;
+    }
+
     private boolean isReservedKeyword(String identifier) {
+      if (config.languageMode == LanguageMode.ECMASCRIPT3) {
+        return TokenStream.isKeyword(identifier);
+      }
       return reservedKeywords != null && reservedKeywords.contains(identifier);
     }
 
@@ -954,8 +976,13 @@ class IRFactory {
           }
         }
 
-        Node key = transformAsString(el.getLeft());
+        AstNode rawKey = el.getLeft();
+        Node key = transformAsString(rawKey);
         key.setType(Token.STRING_KEY);
+        if (rawKey instanceof Name && !isAllowedProp(key.getString())) {
+          errorReporter.warning(INVALID_ES3_PROP_NAME, sourceName,
+              key.getLineno(), "", key.getCharno());
+        }
 
         Node value = transform(el.getRight());
         if (el.isGetter()) {
@@ -1001,8 +1028,15 @@ class IRFactory {
     @Override
     Node processPropertyGet(PropertyGet getNode) {
       Node leftChild = transform(getNode.getTarget());
+      AstNode nodeProp = getNode.getProperty();
+      Node rightChild = transformAsString(nodeProp);
+      if (nodeProp instanceof Name && !isAllowedProp(
+          ((Name) nodeProp).getIdentifier())) {
+        errorReporter.warning(INVALID_ES3_PROP_NAME, sourceName,
+            rightChild.getLineno(), "", rightChild.getCharno());
+      }
       Node newNode = newNode(
-          Token.GETPROP, leftChild, transformAsString(getNode.getProperty()));
+          Token.GETPROP, leftChild, rightChild);
       newNode.setLineno(leftChild.getLineno());
       newNode.setCharno(leftChild.getCharno());
       maybeSetLengthFrom(newNode, getNode);
@@ -1209,7 +1243,15 @@ class IRFactory {
 
     @Override
     Node processVariableInitializer(VariableInitializer initializerNode) {
-      Node node = transform(initializerNode.getTarget());
+      Node node;
+      Comment comment = initializerNode.getTarget().getJsDocNode();
+      // TODO(user): At some point, consider allowing only inline jsdocs for
+      // variable initializers
+      if (comment != null && !comment.getValue().contains("@")) {
+        node = transformNodeWithInlineJsDoc(initializerNode.getTarget());
+      } else {
+        node = transform(initializerNode.getTarget());
+      }
       if (initializerNode.getInitializer() != null) {
         Node initalizer = transform(initializerNode.getInitializer());
         node.addChildToBack(initalizer);
