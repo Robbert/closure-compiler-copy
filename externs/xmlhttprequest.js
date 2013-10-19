@@ -194,6 +194,43 @@ XMLHttpRequestEventTarget.prototype.removeEventListener = function(
 XMLHttpRequestEventTarget.prototype.dispatchEvent = function(evt) {};
 
 /**
+ * @type {?function(Event)}
+ */
+XMLHttpRequestEventTarget.prototype.onloadstart;
+
+/**
+ * @type {?function(Event)}
+ */
+XMLHttpRequestEventTarget.prototype.onprogress;
+
+/**
+ * @type {?function(Event)}
+ */
+XMLHttpRequestEventTarget.prototype.onabort;
+
+/**
+ * @type {?function(Event)}
+ */
+XMLHttpRequestEventTarget.prototype.onerror;
+
+/**
+ * @type {?function(Event)}
+ */
+XMLHttpRequestEventTarget.prototype.onload;
+
+/**
+ * @type {?function(Event)}
+ */
+XMLHttpRequestEventTarget.prototype.ontimeout;
+
+/**
+ * @type {?function(Event)}
+ */
+XMLHttpRequestEventTarget.prototype.onloadend;
+
+
+
+/**
  * An event target to track the status of an upload.
  *
  * @constructor
