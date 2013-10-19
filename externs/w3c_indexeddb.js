@@ -282,45 +282,33 @@ IDBRequest.DONE;
  */
 webkitIDBRequest.DONE;
 
-/**
- * @type {number}
- * @const
- */
-IDBRequest.prototype.readyState;
+/** @type {number} */
+IDBRequest.prototype.readyState; // readonly
 
-/**
- * @type {function(!Event)}
- */
+/** @type {function(!Event)} */
 IDBRequest.prototype.onsuccess = function(e) {};
 
-/**
- * @type {function(!Event)}
- */
+/** @type {function(!Event)} */
 IDBRequest.prototype.onerror = function(e) {};
 
-/**
- * @type {*}
- * @const
- */
-IDBRequest.prototype.result;
+/** @type {*} */
+IDBRequest.prototype.result;  // readonly
 
 /**
  * @type {number}
- * @const
+ * @deprecated Use "error"
  */
-IDBRequest.prototype.errorCode;
+IDBRequest.prototype.errorCode;  // readonly
 
-/**
- * @type {Object}
- * @const
- */
-IDBRequest.prototype.source;
 
-/**
- * @type {IDBTransaction}
- * @const
- */
-IDBRequest.prototype.transaction;
+/** @type {!DOMError} */
+IDBRequest.prototype.error; // readonly
+
+/** @type {Object} */
+IDBRequest.prototype.source; // readonly
+
+/** @type {IDBTransaction} */
+IDBRequest.prototype.transaction; // readonly
 
 /** @type {function(new:IDBOpenDBRequest)} */
 Window.prototype.IDBOpenDBRequest;
@@ -488,7 +476,7 @@ IDBObjectStore.prototype.add = function(value, key) {};
 IDBObjectStore.prototype['delete'] = function(key) {};
 
 /**
- * @param {IDBKeyType} key The key of the document to retrieve.
+ * @param {IDBKeyType|!IDBKeyRange} key The key of the document to retrieve.
  * @return {!IDBRequest} The IDBRequest object.
  */
 IDBObjectStore.prototype.get = function(key) {};
@@ -507,7 +495,7 @@ IDBObjectStore.prototype.openCursor = function(range, direction) {};
 
 /**
  * @param {string} name The name of the index.
- * @param {string} keyPath The path to the index key.
+ * @param {string|!Array.<string>} keyPath The path to the index key.
  * @param {Object=} opt_paramters Optional parameters
  *     for the created index.
  * @return {!IDBIndex} The IDBIndex object.
@@ -526,8 +514,9 @@ IDBObjectStore.prototype.index = function(name) {};
 IDBObjectStore.prototype.deleteIndex = function(indexName) {};
 
 /**
- * @param {IDBKeyType=} key The key of this value.
+ * @param {(IDBKeyType|IDBKeyRange)=} key The key of this value.
  * @return {!IDBRequest} The IDBRequest object.
+ * @see http://www.w3.org/TR/IndexedDB/#widl-IDBObjectStore-count
  */
 IDBObjectStore.prototype.count = function(key) {};
 
@@ -576,13 +565,13 @@ IDBIndex.prototype.openCursor = function(range, direction) {};
 IDBIndex.prototype.openKeyCursor = function(range, direction) {};
 
 /**
- * @param {IDBKeyType} key The id of the object to retrieve.
+ * @param {IDBKeyType|!IDBKeyRange} key The id of the object to retrieve.
  * @return {!IDBRequest} The IDBRequest object.
  */
 IDBIndex.prototype.get = function(key) {};
 
 /**
- * @param {IDBKeyType} key The id of the object to retrieve.
+ * @param {IDBKeyType|!IDBKeyRange} key The id of the object to retrieve.
  * @return {!IDBRequest} The IDBRequest object.
  */
 IDBIndex.prototype.getKey = function(key) {};

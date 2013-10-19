@@ -16,37 +16,12 @@
 
 package com.google.javascript.jscomp;
 
-import com.google.javascript.rhino.Node;
-
 /**
  * A simple listener for code change events.
- * Records whether the code has changed since the last reset.
  * @author nicksantos@google.com (Nick Santos)
  * @author dimvar@google.com (Dimitris Vardoulakis)
  */
-class CodeChangeHandler {
-  private boolean hasChanged = false;
-
+interface CodeChangeHandler {
   /** Report a change to some unspecified node of the AST. */
-  public void reportChange() {
-    hasChanged = true;
-  }
-
-  /** Report a change to a specific function in the AST. */
-  public void reportChangedFun(Node n) {
-    hasChanged = true;
-  }
-
-  /** Report that a function node has been removed from the AST */
-  public void reportDeletedFun(Node n) {
-    hasChanged = true;
-  }
-
-  void reset() {
-    hasChanged = false;
-  }
-
-  boolean hasCodeChanged() {
-    return hasChanged;
-  }
+  public void reportChange();
 }

@@ -34,9 +34,10 @@ import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.logging.Logger;
 
+/** parser runner */
 public class ParserRunner {
 
-  private static final String configResource =
+  private static final String CONFIG_RESOURCE =
       "com.google.javascript.jscomp.parsing.ParserConfig";
 
   private static Set<String> annotationNames = null;
@@ -46,11 +47,6 @@ public class ParserRunner {
 
   // Should never need to instantiate class of static methods.
   private ParserRunner() {}
-
-  @Deprecated
-  public static Config createConfig(boolean isIdeMode) {
-    return createConfig(isIdeMode, LanguageMode.ECMASCRIPT3, false);
-  }
 
   public static Config createConfig(boolean isIdeMode,
                                     LanguageMode languageMode,
@@ -84,7 +80,7 @@ public class ParserRunner {
       return;
     }
 
-    ResourceBundle config = ResourceBundle.getBundle(configResource);
+    ResourceBundle config = ResourceBundle.getBundle(CONFIG_RESOURCE);
     annotationNames = extractList(config.getString("jsdoc.annotations"));
     suppressionNames = extractList(config.getString("jsdoc.suppressions"));
     reservedVars = extractList(config.getString("compiler.reserved.vars"));
@@ -125,10 +121,7 @@ public class ParserRunner {
     compilerEnv.setWarnTrailingComma(
         config.languageMode == LanguageMode.ECMASCRIPT3);
 
-    // Do our own identifier check for ECMASCRIPT 5
-    boolean acceptEs5 =
-        config.isIdeMode || config.languageMode != LanguageMode.ECMASCRIPT3;
-    compilerEnv.setReservedKeywordAsIdentifier(acceptEs5);
+    compilerEnv.setReservedKeywordAsIdentifier(true);
 
     compilerEnv.setAllowMemberExprAsFunctionName(false);
     compilerEnv.setIdeMode(config.isIdeMode);

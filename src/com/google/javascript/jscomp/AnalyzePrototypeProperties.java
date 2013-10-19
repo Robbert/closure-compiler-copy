@@ -24,8 +24,8 @@ import com.google.common.collect.Sets;
 import com.google.javascript.jscomp.NodeTraversal.AbstractPostOrderCallback;
 import com.google.javascript.jscomp.Scope.Var;
 import com.google.javascript.jscomp.graph.FixedPointGraphTraversal;
-import com.google.javascript.jscomp.graph.LinkedDirectedGraph;
 import com.google.javascript.jscomp.graph.FixedPointGraphTraversal.EdgeCallback;
+import com.google.javascript.jscomp.graph.LinkedDirectedGraph;
 import com.google.javascript.rhino.Node;
 import com.google.javascript.rhino.Token;
 
@@ -52,8 +52,8 @@ import java.util.Stack;
 class AnalyzePrototypeProperties implements CompilerPass {
 
   // Constants for symbol types, for easier readability.
-  private final SymbolType PROPERTY = SymbolType.PROPERTY;
-  private final SymbolType VAR = SymbolType.VAR;
+  private static final SymbolType PROPERTY = SymbolType.PROPERTY;
+  private static final SymbolType VAR = SymbolType.VAR;
 
   private final AbstractCompiler compiler;
   private final boolean canModifyExterns;
@@ -196,7 +196,7 @@ class AnalyzePrototypeProperties implements CompilerPass {
     //    name are given a special [anonymous] context.
     // 2) Every assignment of a prototype property of a non-function is
     //    given a name context. These contexts do not have scopes.
-    private Stack<NameContext> symbolStack = new Stack<NameContext>();
+    private final Stack<NameContext> symbolStack = new Stack<NameContext>();
 
     @Override
     public void enterScope(NodeTraversal t) {
@@ -545,7 +545,7 @@ class AnalyzePrototypeProperties implements CompilerPass {
     /**
      * Remove the declaration from the AST.
      */
-    void remove();
+    void remove(AbstractCompiler compiler);
 
     /**
      * The variable for the root of this symbol.
@@ -587,8 +587,9 @@ class AnalyzePrototypeProperties implements CompilerPass {
     }
 
     @Override
-    public void remove() {
+    public void remove(AbstractCompiler compiler) {
       Node parent = nameNode.getParent();
+      compiler.reportChangeToEnclosingScope(parent);
       if (parent.isFunction() || parent.hasOneChild()) {
         NodeUtil.removeChild(parent.getParent(), parent);
       } else {
@@ -653,7 +654,8 @@ class AnalyzePrototypeProperties implements CompilerPass {
     }
 
     @Override
-    public void remove() {
+    public void remove(AbstractCompiler compiler) {
+      compiler.reportChangeToEnclosingScope(exprNode);
       NodeUtil.removeChild(exprNode.getParent(), exprNode);
     }
 
@@ -707,7 +709,8 @@ class AnalyzePrototypeProperties implements CompilerPass {
     }
 
     @Override
-    public void remove() {
+    public void remove(AbstractCompiler compiler) {
+      compiler.reportChangeToEnclosingScope(key);
       map.removeChild(key);
     }
 

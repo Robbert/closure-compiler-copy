@@ -26,10 +26,9 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.common.collect.TreeMultimap;
+import com.google.common.io.CharSource;
 import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
-import com.google.common.io.InputSupplier;
-import com.google.javascript.jscomp.CheckLevel;
 
 import java.io.File;
 import java.io.IOException;
@@ -131,17 +130,16 @@ public class WhitelistWarningsGuard extends WarningsGuard {
    */
   public static Set<String> loadWhitelistedJsWarnings(File file) {
     return loadWhitelistedJsWarnings(
-        Files.newReaderSupplier(file, Charsets.UTF_8));
+        Files.asCharSource(file, Charsets.UTF_8));
   }
 
   /**
    * Loads legacy warnings list from the file.
    * @return The lines of the file.
    */
-  protected static Set<String> loadWhitelistedJsWarnings(
-      InputSupplier<? extends Reader> supplier) {
+  protected static Set<String> loadWhitelistedJsWarnings(CharSource supplier) {
     try {
-      return loadWhitelistedJsWarnings(supplier.getInput());
+      return loadWhitelistedJsWarnings(supplier.openStream());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -201,6 +199,7 @@ public class WhitelistWarningsGuard extends WarningsGuard {
     return warning;
   }
 
+  /** Whitelist builder */
   public static class WhitelistBuilder implements ErrorHandler {
     private final Set<JSError> warnings = Sets.newLinkedHashSet();
     private String productName = null;
@@ -254,16 +253,16 @@ public class WhitelistWarningsGuard extends WarningsGuard {
       out.append(
           "# This is a list of legacy warnings that have yet to be fixed.\n");
 
-      if (productName != null) {
+      if (productName != null && !productName.isEmpty()) {
         out.append("# Please find some time and fix at least one of them "
             + "and it will be the happiest day for " + productName + ".\n");
       }
 
-      if (generatorTarget != null) {
+      if (generatorTarget != null && !generatorTarget.isEmpty()) {
         out.append("# When you fix any of these warnings, run "
             + generatorTarget + " task.\n");
       }
-      
+
       if (headerNote != null) {
         out.append("#"
             + Joiner.on("\n# ").join(Splitter.on("\n").split(headerNote))

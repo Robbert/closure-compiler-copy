@@ -94,7 +94,7 @@ public class JSDocInfo implements Serializable {
     Map<String, JSTypeExpression> parameters = null;
     List<JSTypeExpression> thrownTypes = null;
     ImmutableList<String> templateTypeNames = null;
-    ImmutableList<String> classTemplateTypeNames = null;
+    Set<String> disposedParameters = null;
 
     // Other information
     String description = null;
@@ -104,7 +104,16 @@ public class JSDocInfo implements Serializable {
     Set<String> suppressions = null;
     Set<String> modifies = null;
     String lendsName = null;
+
+    // TODO(nnaze): Consider converting the boolean flags to bit fields.
+
     boolean ngInject = false;
+    boolean wizaction = false;
+
+    // Tags for Jagger dependency injection prototype
+    boolean jaggerInject = false;
+    boolean jaggerProvide = false;
+    boolean jaggerModule = false;
   }
 
   private static final class LazilyInitializedDocumentation {
@@ -289,6 +298,11 @@ public class JSDocInfo implements Serializable {
    */
   private boolean includeDocumentation = false;
 
+  /**
+   * Position of the original comment.
+   */
+  private int originalCommentPosition;
+
   // We use a bit map to represent whether or not the JSDoc contains
   // one of the "boolean" annotation types (annotations like @constructor,
   // for which the presence of the annotation alone is significant).
@@ -320,6 +334,7 @@ public class JSDocInfo implements Serializable {
   private static final int MASK_STRUCT        = 0x00200000; // @struct
   private static final int MASK_DICT          = 0x00400000; // @dict
   private static final int MASK_STALBEIDGEN   = 0x00800000; // @stableIdGenerator
+  private static final int MASK_MAPPEDIDGEN   = 0x01000000; // @idGenerator {mapped}
 
   // 3 bit type field stored in the top 3 bits of the most significant
   // nibble.
@@ -346,6 +361,10 @@ public class JSDocInfo implements Serializable {
 
   void setStableIdGenerator(boolean value) {
     setFlag(value, MASK_STALBEIDGEN);
+  }
+
+  void setMappedIdGenerator(boolean value) {
+    setFlag(value, MASK_MAPPEDIDGEN);
   }
 
   void setConstant(boolean value) {
@@ -454,6 +473,13 @@ public class JSDocInfo implements Serializable {
    */
   public boolean isStableIdGenerator() {
     return getFlag(MASK_STALBEIDGEN);
+  }
+
+  /**
+   * @return whether the {@code @stableIdGenerator} is present on this {@link JSDocInfo}.
+   */
+  public boolean isMappedIdGenerator() {
+    return getFlag(MASK_MAPPEDIDGEN);
   }
 
   /**
@@ -955,23 +981,6 @@ public class JSDocInfo implements Serializable {
   }
 
   /**
-   * Declares a template type name. Template type names are described using the
-   * {@code @template} annotation.
-   *
-   * @param templateTypeNames the template type name.
-   */
-  boolean declareClassTemplateTypeNames(List<String> templateTypeNames) {
-    lazyInitInfo();
-
-    if (info.classTemplateTypeNames != null) {
-      return false;
-    }
-
-    info.classTemplateTypeNames = ImmutableList.copyOf(templateTypeNames);
-    return true;
-  }
-
-  /**
    * Declares that the method throws a given type.
    *
    * @param jsType The type that can be thrown by the method.
@@ -1257,6 +1266,83 @@ public class JSDocInfo implements Serializable {
   }
 
   /**
+   * Returns whether JSDoc is annotated with {@code @jaggerInject} annotation.
+   */
+  public boolean isJaggerInject() {
+    return (info != null) && info.jaggerInject;
+  }
+
+  void setJaggerInject(boolean jaggerInject) {
+    lazyInitInfo();
+    info.jaggerInject = jaggerInject;
+  }
+
+  /**
+   * Returns whether JSDoc is annotated with {@code @jaggerProvide} annotation.
+   */
+  public boolean isJaggerProvide() {
+    return (info != null) && info.jaggerProvide;
+  }
+
+  void setJaggerProvide(boolean jaggerProvide) {
+    lazyInitInfo();
+    info.jaggerProvide = jaggerProvide;
+  }
+
+  /**
+   * Returns whether JSDoc is annotated with {@code @jaggerModule} annotation.
+   */
+  public boolean isJaggerModule() {
+      return (info != null) && info.jaggerModule;
+  }
+
+  void setJaggerModule(boolean jaggerModule) {
+    lazyInitInfo();
+    info.jaggerModule = jaggerModule;
+  }
+
+  /**
+   * Returns whether JSDoc is annotated with {@code @wizaction} annotation.
+   */
+  public boolean isWizaction() {
+    return (info == null) ? false : info.wizaction;
+  }
+
+  void setWizaction(boolean wizaction) {
+    lazyInitInfo();
+    info.wizaction = wizaction;
+  }
+
+  /**
+   * Returns whether JSDoc is annotated with {@code @disposes} annotation.
+   */
+  public boolean isDisposes() {
+    return (info == null) ? false : info.disposedParameters != null;
+  }
+
+  boolean setDisposedParameter(String parameterName) {
+    lazyInitInfo();
+    // Lazily initialize disposedParameters
+    if (info.disposedParameters == null) {
+      info.disposedParameters = Sets.newHashSet();
+    }
+
+    if (info.disposedParameters.contains(parameterName)) {
+      return false;
+    } else {
+      info.disposedParameters.add(parameterName);
+      return true;
+    }
+  }
+
+  /**
+   * Return whether the function disposes of specified parameter.
+   */
+  public boolean disposesOf(String parameterName) {
+    return isDisposes() && info.disposedParameters.contains(parameterName);
+  }
+
+  /**
    * Gets the description specified by the {@code @license} annotation.
    */
   public String getLicense() {
@@ -1499,13 +1585,6 @@ public class JSDocInfo implements Serializable {
     return info.templateTypeNames;
   }
 
-  public ImmutableList<String> getClassTemplateTypeNames() {
-    if (info == null || info.classTemplateTypeNames == null) {
-      return ImmutableList.of();
-    }
-    return info.classTemplateTypeNames;
-  }
-
   /**
    * Returns a collection of all type nodes that are a part of this JSDocInfo.
    * This includes @type, @this, @extends, @implements, @param, @throws,
@@ -1578,5 +1657,13 @@ public class JSDocInfo implements Serializable {
       return;
     }
     documentation.sourceComment = sourceComment;
+  }
+
+  public int getOriginalCommentPosition() {
+    return originalCommentPosition;
+  }
+
+  void setOriginalCommentPosition(int position) {
+    originalCommentPosition = position;
   }
 }

@@ -459,7 +459,7 @@ class DisambiguateProperties<T> implements CompilerPass {
             JSType jsType = (JSType) type;
             if (jsType.isAllType() || jsType.isUnknownType()) {
               if (n.getFirstChild().isThis()) {
-                suggestion = "The \"this\" object is unknown in the function,"+
+                suggestion = "The \"this\" object is unknown in the function," +
                     "consider using @this";
               } else {
                 String qName = n.getFirstChild().getQualifiedName();
@@ -488,9 +488,13 @@ class DisambiguateProperties<T> implements CompilerPass {
      * Processes a OBJECTLIT node.
      */
     private void handleObjectLit(NodeTraversal t, Node n) {
-      Node child = n.getFirstChild();
-      while (child != null) {
+      for (Node child = n.getFirstChild();
+          child != null;
+          child = child.getNext()) {
         // Maybe STRING, GET, SET
+        if (child.isQuotedString()) {
+          continue;
+        }
 
         // We should never see a mix of numbers and strings.
         String name = child.getString();
@@ -508,7 +512,6 @@ class DisambiguateProperties<T> implements CompilerPass {
                 (type == null ? "null" : type.toString()), n.toString(), ""));
           }
         }
-        child = child.getNext();
       }
     }
 
@@ -653,7 +656,7 @@ class DisambiguateProperties<T> implements CompilerPass {
   /** Returns a map from field name to types for which it will be renamed. */
   Multimap<String, Collection<T>> getRenamedTypesForTesting() {
     Multimap<String, Collection<T>> ret = HashMultimap.create();
-    for (Map.Entry<String, Property> entry: properties.entrySet()) {
+    for (Map.Entry<String, Property> entry : properties.entrySet()) {
       Property prop = entry.getValue();
       if (!prop.skipRenaming) {
         for (Collection<T> c : prop.getTypes().allEquivalenceClasses()) {
@@ -944,7 +947,9 @@ class DisambiguateProperties<T> implements CompilerPass {
             }
 
             // If this interface invalidated this property, return now.
-            if (p.skipRenaming) return;
+            if (p.skipRenaming) {
+              return;
+            }
           }
           if (constructor.isInterface() || constructor.isConstructor()) {
             constructor = constructor.getSuperClassConstructor();

@@ -34,6 +34,7 @@ enum Annotation {
   DEPRECATED,
   DESC,
   DICT,
+  DISPOSES,
   ENUM,
   EXTENDS,
   EXTERNS,
@@ -47,6 +48,9 @@ enum Annotation {
   INHERIT_DOC,
   INTERFACE,
   JAVA_DISPATCH,
+  JAGGER_INJECT,
+  JAGGER_MODULE,
+  JAGGER_PROVIDE,
   LENDS,
   LICENSE, // same as preserve
   MEANING,
@@ -70,12 +74,12 @@ enum Annotation {
   STRUCT,
   SUPPRESS,
   TEMPLATE,
-  CLASS_TEMPLATE,
   THIS,
   THROWS,
   TYPE,
   TYPEDEF,
-  VERSION;
+  VERSION,
+  WIZACTION;
 
   static final Map<String, Annotation> recognizedAnnotations =
       new ImmutableMap.Builder<String, Annotation>().
@@ -91,6 +95,7 @@ enum Annotation {
       put("deprecated", Annotation.DEPRECATED).
       put("desc", Annotation.DESC).
       put("dict", Annotation.DICT).
+      put("disposes", Annotation.DISPOSES).
       put("enum", Annotation.ENUM).
       put("export", Annotation.EXPORT).
       put("expose", Annotation.EXPOSE).
@@ -105,6 +110,9 @@ enum Annotation {
       put("inheritDoc", Annotation.INHERIT_DOC).
       put("interface", Annotation.INTERFACE).
       put("javadispatch", Annotation.JAVA_DISPATCH).
+      put("jaggerInject", Annotation.JAGGER_INJECT).
+      put("jaggerModule", Annotation.JAGGER_MODULE).
+      put("jaggerProvide", Annotation.JAGGER_PROVIDE).
       put("lends", Annotation.LENDS).
       put("license", Annotation.LICENSE).
       put("meaning", Annotation.MEANING).
@@ -129,11 +137,11 @@ enum Annotation {
       put("struct", Annotation.STRUCT).
       put("suppress", Annotation.SUPPRESS).
       put("template", Annotation.TEMPLATE).
-      put("classTemplate", Annotation.CLASS_TEMPLATE).
       put("this", Annotation.THIS).
       put("throws", Annotation.THROWS).
       put("type", Annotation.TYPE).
       put("typedef", Annotation.TYPEDEF).
       put("version", Annotation.VERSION).
+      put("wizaction", Annotation.WIZACTION).
       build();
 }

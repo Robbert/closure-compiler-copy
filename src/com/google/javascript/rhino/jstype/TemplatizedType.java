@@ -52,22 +52,25 @@ public final class TemplatizedType extends ProxyObjectType {
   private static final long serialVersionUID = 1L;
 
   final ImmutableList<JSType> templateTypes;
+  final TemplateTypeMapReplacer replacer;
 
   TemplatizedType(
       JSTypeRegistry registry, ObjectType objectType,
       ImmutableList<JSType> templateTypes) {
-    super(registry, objectType, objectType.getTemplateTypeMap().extendValues(
+    super(registry, objectType, objectType.getTemplateTypeMap().addValues(
         templateTypes));
 
     // Cache which template keys were filled, and what JSTypes they were filled
     // with.
-    ImmutableList<String> filledTemplateKeys =
+    ImmutableList<TemplateType> filledTemplateKeys =
         objectType.getTemplateTypeMap().getUnfilledTemplateKeys();
     ImmutableList.Builder<JSType> builder = ImmutableList.builder();
-    for (String filledTemplateKey : filledTemplateKeys) {
+    for (TemplateType filledTemplateKey : filledTemplateKeys) {
       builder.add(getTemplateTypeMap().getTemplateType(filledTemplateKey));
     }
     this.templateTypes = builder.build();
+
+    replacer = new TemplateTypeMapReplacer(registry, getTemplateTypeMap());
   }
 
   @Override
@@ -100,7 +103,13 @@ public final class TemplatizedType extends ProxyObjectType {
     return templateTypes;
   }
 
-  //@Override
+  @Override
+  public JSType getPropertyType(String propertyName) {
+    JSType result = super.getPropertyType(propertyName);
+    return result == null ? null : result.visit(replacer);
+  }
+
+  @Override
   public boolean isSubtype(JSType that) {
     return isSubtypeHelper(this, that);
   }

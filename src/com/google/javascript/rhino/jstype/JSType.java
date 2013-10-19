@@ -44,7 +44,6 @@ import static com.google.javascript.rhino.jstype.TernaryValue.UNKNOWN;
 import com.google.common.base.Predicate;
 import com.google.javascript.rhino.ErrorReporter;
 import com.google.javascript.rhino.JSDocInfo;
-import com.google.javascript.rhino.jstype.JSTypeRegistry.ResolveMode;
 
 import java.io.Serializable;
 import java.util.Comparator;
@@ -69,7 +68,7 @@ public abstract class JSType implements Serializable {
 
   private boolean resolved = false;
   private JSType resolveResult = null;
-  protected final TemplateTypeMap templateTypeMap;
+  protected TemplateTypeMap templateTypeMap;
 
   private boolean inTemplatedCheckVisit = false;
   private static final CanCastToVisitor CAN_CAST_TO_VISITOR =
@@ -458,6 +457,14 @@ public abstract class JSType implements Serializable {
   }
 
   /**
+   * Extends the template type map associated with this type, merging in the
+   * keys and values of the specified map.
+   */
+  public void extendTemplateTypeMap(TemplateTypeMap otherMap) {
+    templateTypeMap = templateTypeMap.extend(otherMap);
+  }
+
+  /**
    * Tests whether this type is an {@code Object}, or any subtype thereof.
    * @return {@code this &lt;: Object}
    */
@@ -608,6 +615,10 @@ public abstract class JSType implements Serializable {
     if (isNominalType() && that.isNominalType()) {
       return toObjectType().getReferenceName().equals(
           that.toObjectType().getReferenceName());
+    }
+
+    if (isTemplateType() && that.isTemplateType()) {
+      return this == that;
     }
 
     // Unbox other proxies.
@@ -1250,18 +1261,34 @@ public abstract class JSType implements Serializable {
       return false;
     }
 
-    // templatized types.
-    if (thisType.isTemplatizedType()) {
-      return !areIncompatibleArrays(thisType, thatType) &&
-          thisType.toMaybeTemplatizedType().getReferencedType().isSubtype(
-              thatType);
+    // TemplateTypeMaps. This check only returns false if the TemplateTypeMaps
+    // are not equivalent.
+    TemplateTypeMap thisTypeParams = thisType.getTemplateTypeMap();
+    TemplateTypeMap thatTypeParams = thatType.getTemplateTypeMap();
+    boolean templateMatch = true;
+    if (isExemptFromTemplateTypeInvariance(thatType)) {
+      // Array and Object are exempt from template type invariance; their
+      // template types maps are considered a match only if the ObjectElementKey
+      // values are subtypes/supertypes of one another.
+      TemplateType key = thisType.registry.getObjectElementKey();
+      JSType thisElement = thisTypeParams.getTemplateType(key);
+      JSType thatElement = thatTypeParams.getTemplateType(key);
+
+      templateMatch = thisElement.isSubtype(thatElement)
+          || thatElement.isSubtype(thisElement);
+    } else {
+      templateMatch = thisTypeParams.checkEquivalenceHelper(
+          thatTypeParams, EquivalenceMethod.INVARIANT);
     }
-    if (thatType.isTemplatizedType()) {
-      if (!isExemptFromTemplateTypeInvariance(thatType) &&
-          !thisType.getTemplateTypeMap().checkEquivalenceHelper(
-              thatType.getTemplateTypeMap(), EquivalenceMethod.IDENTITY)) {
-        return false;
-      }
+    if (!templateMatch) {
+      return false;
+    }
+
+    // Templatized types. The above check guarantees TemplateTypeMap
+    // equivalence; check if the base type is a subtype.
+    if (thisType.isTemplatizedType()) {
+      return thisType.toMaybeTemplatizedType().getReferencedType().isSubtype(
+              thatType);
     }
 
     // proxy types
@@ -1270,28 +1297,6 @@ public abstract class JSType implements Serializable {
           ((ProxyObjectType) thatType).getReferencedTypeInternal());
     }
     return false;
-  }
-
-  /**
-   * Determines if two types are incompatible Arrays, meaning that their element
-   * template types are not subtypes of one another.
-   */
-  private static boolean areIncompatibleArrays(JSType type1, JSType type2) {
-    ObjectType type1Obj = type1.toObjectType();
-    ObjectType type2Obj = type2.toObjectType();
-    if (type1Obj == null || type2Obj == null) {
-      return false;
-    }
-
-    if (!"Array".equals(type1Obj.getReferenceName()) ||
-        !"Array".equals(type2Obj.getReferenceName())) {
-      return false;
-    }
-
-    String templateKey = JSTypeRegistry.OBJECT_ELEMENT_TEMPLATE;
-    JSType elemType1 = type1.getTemplateTypeMap().getTemplateType(templateKey);
-    JSType elemType2 = type2.getTemplateTypeMap().getTemplateType(templateKey);
-    return !elemType1.isSubtype(elemType2) && !elemType2.isSubtype(elemType1);
   }
 
   /**
@@ -1318,20 +1323,6 @@ public abstract class JSType implements Serializable {
    * @return the value returned by the visitor
    */
   abstract <T> T visit(RelationshipVisitor<T> visitor, JSType that);
-
-  /**
-   * Force this type to resolve, even if the registry is in a lazy
-   * resolving mode.
-   * @see #resolve
-   */
-  public final JSType forceResolve(ErrorReporter t, StaticScope<JSType> scope) {
-    ResolveMode oldResolveMode = registry.getResolveMode();
-    registry.setResolveMode(ResolveMode.IMMEDIATE);
-    JSType result = resolve(t, scope);
-    registry.setResolveMode(oldResolveMode);
-    return result;
-  }
-
 
   /**
    * Resolve this type in the given scope.

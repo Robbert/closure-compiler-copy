@@ -18,9 +18,8 @@ package com.google.javascript.jscomp;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.ByteStreams;
-import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
 
 import java.io.*;
@@ -131,20 +130,16 @@ public class VariableMap {
     return baos.toByteArray();
   }
 
+  private static final Splitter LINE_SPLITTER
+      = Splitter.onPattern("\\r?\\n").omitEmptyStrings();
+
   /**
    * Deserializes the variable map from a byte array returned by
    * {@link #toBytes()}.
    */
   public static VariableMap fromBytes(byte[] bytes) throws ParseException {
-    Iterable<String> lines;
-    try {
-      lines = CharStreams.readLines(CharStreams.newReaderSupplier(
-          ByteStreams.newInputStreamSupplier(bytes), Charsets.UTF_8));
-    } catch (IOException e) {
-      // Note: An IOException is never thrown while reading from a byte array.
-      // This try/catch is just here to appease the Java compiler.
-      throw new RuntimeException(e);
-    }
+    Iterable<String> lines = LINE_SPLITTER.split(
+        new String(bytes, Charsets.UTF_8));
 
     ImmutableMap.Builder<String, String> map = ImmutableMap.builder();
 
@@ -168,7 +163,7 @@ public class VariableMap {
 
   private static int findIndexOfChar(String value, char stopChar) {
     int len = value.length();
-    for (int i=0; i<len; i++) {
+    for (int i = 0; i < len; i++) {
       char c = value.charAt(i);
       if (c == '\\' && ++i < len) {
         c = value.charAt(i);
@@ -182,7 +177,7 @@ public class VariableMap {
   private static String unescape(CharSequence value) {
     StringBuilder sb = new StringBuilder();
     int len = value.length();
-    for (int i=0; i<len; i++) {
+    for (int i = 0; i < len; i++) {
       char c = value.charAt(i);
       if (c == '\\' && ++i < len) {
         c = value.charAt(i);

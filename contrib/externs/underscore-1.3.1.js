@@ -15,7 +15,7 @@
  */
 
 /**
- * @fileoverview Externs for Underscore 1.3.1
+ * @fileoverview Externs for Underscore 1.3.1.
  *
  * TODO: Wrapper objects.
  * TODO: _.bind - for some reason this plays up in practice.
@@ -29,7 +29,7 @@
  * @return {!_}
  * @constructor
  */
-function _(obj) {};
+function _(obj) {}
 
 // Collection functions
 
@@ -166,19 +166,19 @@ _.all = function(obj, iterator, opt_context) {};
 
 /**
  * @param {Object|Array} obj
- * @param {Function} iterator
+ * @param {Function=} opt_iterator
  * @param {Object=} opt_context
  * @return {boolean}
  */
-_.some = function(obj, iterator, opt_context) {};
+_.some = function(obj, opt_iterator, opt_context) {};
 
 /**
  * @param {Object|Array} obj
- * @param {Function} iterator
+ * @param {Function=} opt_iterator
  * @param {Object=} opt_context
  * @return {boolean}
  */
-_.any = function(obj, iterator, opt_context) {};
+_.any = function(obj, opt_iterator, opt_context) {};
 
 /**
  * @param {Object|Array} obj
@@ -332,7 +332,7 @@ _.without = function(array, var_args) {};
 /**
  * @param {Array} array
  * @param {boolean=} opt_isSorted
- * @param {Function} opt_iterator
+ * @param {Function=} opt_iterator
  * @return {!Array}
  */
 _.uniq = function(array, opt_isSorted, opt_iterator) {};
@@ -340,7 +340,7 @@ _.uniq = function(array, opt_isSorted, opt_iterator) {};
 /**
  * @param {Array} array
  * @param {boolean=} opt_isSorted
- * @param {Function} opt_iterator
+ * @param {Function=} opt_iterator
  * @return {!Array}
  */
 _.unique = function(array, opt_isSorted, opt_iterator) {};
@@ -529,7 +529,7 @@ _.isEmpty = function(obj) {};
  * @param {*} obj
  * @return {boolean}
  */
-_.isElement = function(obj) {}
+_.isElement = function(obj) {};
 
 /**
  * @param {*} obj
@@ -628,7 +628,7 @@ _.identity = function(value) {};
  * @param {Function} iterator
  * @param {Object=} opt_context
  */
-_.times = function (n, iterator, opt_context) {};
+_.times = function(n, iterator, opt_context) {};
 
 /**
  * @param {string} s

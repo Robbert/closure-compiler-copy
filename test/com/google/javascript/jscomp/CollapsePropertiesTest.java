@@ -27,8 +27,11 @@ import com.google.javascript.rhino.Node;
 public class CollapsePropertiesTest extends CompilerTestCase {
 
   private static String EXTERNS =
-      "var window; function alert(s) {} function parseInt(s) {}" +
-      "/** @constructor */ function String() {}";
+      "var window;\n" +
+      "function alert(s) {}\n" +
+      "function parseInt(s) {}\n" +
+      "/** @constructor */ function String() {};\n" +
+      "var arguments";
 
   private boolean collapsePropertiesOnExternTypes = false;
 
@@ -110,9 +113,9 @@ public class CollapsePropertiesTest extends CompilerTestCase {
   }
 
   public void testObjLitDeclarationWithDuplicateKeys() {
+    disableNormalize();
     test("var a = {b: 0, b: 1}; var c = a.b;",
-         "var a$b = 0; var a$b = 1; var c = a$b;",
-         SyntacticScopeCreator.VAR_MULTIPLY_DECLARED_ERROR);
+         "var a$b = 0; var a$b = 1; var c = a$b;");
   }
 
   public void testObjLitAssignmentDepth1() {
@@ -706,9 +709,14 @@ public class CollapsePropertiesTest extends CompilerTestCase {
          "var a$b$c = function(){}; a$b$c();");
   }
 
-  public void testFunctionAlias() {
-    test("var a = {}; a.b = {}; a.b.c = function(){}; a.b.d = a.b.c;",
-         "var a$b$c = function(){}; var a$b$d = a$b$c;");
+  public void testFunctionAlias1() {
+    test("var a = {}; a.b = {}; a.b.c = function(){}; a.b.d = a.b.c;a.b.d=null",
+         "var a$b$c = function(){}; var a$b$d = a$b$c;a$b$d=null;");
+  }
+
+  public void testFunctionAlias2() {
+    test("var a = {}; a.b = {}; a.b.c = function(){}; a.b.d = a.b.c;use(a.b.d)",
+         "var a$b$c = function(){}; var a$b$d = null;use(a$b$c);");
   }
 
   public void testCallToRedefinedFunction() {
@@ -932,7 +940,8 @@ public class CollapsePropertiesTest extends CompilerTestCase {
     // This verifies that replacements are done in the right order. Collapsing
     // the l-value in an assignment affects the parse tree immediately above
     // the r-value, so we update all rvalues before any lvalues.
-    test("var a = {b: 0}; a.c = a.b;", "var a$b = 0; var a$c = a$b;");
+    test("var a = {b: 0}; a.c = a.b;a.c = null",
+         "var a$b = 0; var a$c = a$b;a$c = null");
   }
 
   public void testCallOnUndefinedProperty() {
@@ -1091,6 +1100,17 @@ public class CollapsePropertiesTest extends CompilerTestCase {
          "if (!Array.forEach) {\n" +
          "  Array.forEach = function() {};\n" +
          "}", null, null);
+  }
+
+  public void testIssue931() {
+    collapsePropertiesOnExternTypes = true;
+    testSame(
+      "function f() {\n" +
+      "  return function () {\n" +
+      "    var args = arguments;\n" +
+      "    setTimeout(function() { alert(args); }, 0);\n" +
+      "  }\n" +
+      "};\n");
   }
 
   public void testDoNotCollapsePropertyOnExternType() {
@@ -1487,5 +1507,232 @@ public class CollapsePropertiesTest extends CompilerTestCase {
     Node varNode = fooBarNode.getParent();
     assertTrue(varNode.isVar());
     assertTrue(varNode.getJSDocInfo().isConstructor());
+  }
+
+  public void testTypeDefAlias1() {
+    test(
+        "/** @constructor */ var D = function() {};\n" +
+        "/** @constructor */ D.L = function() {};\n" +
+        "/** @type {D.L} */ D.L.A = new D.L();\n" +
+        "\n" +
+        "/** @const */ var M = {};\n" +
+        "/** @typedef {D.L} */ M.L = D.L;\n" +
+        "\n" +
+        "use(M.L.A);",
+
+        "var D = function() {};\n" +
+        "var D$L = function() {};\n" +
+        "var D$L$A = new D$L();\n" +
+        "var M$L = null\n" +
+        "use(D$L$A);");
+  }
+
+  public void testTypeDefAlias2() {
+    // TODO(johnlenz): make CollapseProperties safer around aliases of
+    // functions and object literals.  Currently, this pass trades correctness
+    // for code size.  We should able to create a safer compromise by teaching
+    // the pass about goog.inherits and similiar calls.
+    test(
+        "/** @constructor */ var D = function() {};\n" +
+        "/** @constructor */ D.L = function() {};\n" +
+        "/** @type {D.L} */ D.L.A = new D.L();\n" +
+        "\n" +
+        "/** @const */ var M = {};\n" +
+        "if (random) { /** @typedef {D.L} */ M.L = D.L; }\n" +
+        "\n" +
+        "use(M.L);\n" +
+        "use(M.L.A);\n",
+
+        "var D = function() {};\n" +
+        "var D$L = function() {};\n" +
+        "var D$L$A = new D$L();\n" +
+        "if (random) { var M$L = D$L; }\n" +
+        "use(M$L);\n" +
+        "use(M$L.A);");
+  }
+
+  public void testGlobalAliasWithProperties1() {
+    test("var ns = {}; " +
+        "/** @constructor */ ns.Foo = function() {};\n" +
+        "/** @enum {number} */ ns.Foo.EventType = {A:1, B:2};" +
+        "/** @constructor */ ns.Bar = ns.Foo;\n" +
+        "var x = function() {use(ns.Bar.EventType.A)};\n" +
+        "use(x);",
+        "var ns$Foo = function(){};" +
+        "var ns$Foo$EventType$A = 1;" +
+        "var ns$Foo$EventType$B = 2;" +
+        "var ns$Bar = null;" +
+        "var x = function(){use(ns$Foo$EventType$A)};" +
+        "use(x);");
+  }
+
+  public void testGlobalAliasWithProperties2() {
+    // Reassignment of properties was necessary to prevent invalid code in
+    // previous iterations of this optimization.  Verify we don't break
+    // code like this.  Now it causes a back-off of the collapsing because
+    // the value is assigned more than once.
+    test("var ns = {}; " +
+        "/** @constructor */ ns.Foo = function() {};\n" +
+        "/** @enum {number} */ ns.Foo.EventType = {A:1, B:2};" +
+        "/** @constructor */ ns.Bar = ns.Foo;\n" +
+        "/** @enum {number} */ ns.Bar.EventType = ns.Foo.EventType;\n" +
+        "var x = function() {use(ns.Bar.EventType.A)};\n" +
+        "use(x)",
+        "var ns$Foo = function(){};" +
+        "var ns$Foo$EventType = {A:1, B:2};" +
+        "var ns$Bar = null;" +
+        "ns$Foo$EventType = ns$Foo$EventType;\n" +
+        "var x = function(){use(ns$Foo$EventType.A)};" +
+        "use(x);");
+  }
+
+  public void testGlobalAliasWithProperties3() {
+    test("var ns = {}; " +
+        "/** @constructor */ ns.Foo = function() {};\n" +
+        "/** @enum {number} */ ns.Foo.EventType = {A:1, B:2};" +
+        "/** @constructor */ ns.Bar = ns.Foo;\n" +
+        "/** @enum {number} */ ns.Bar.Other = {X:1, Y:2};\n" +
+        "var x = function() {use(ns.Bar.Other.X)};\n" +
+        "use(x)",
+        "var ns$Foo=function(){};" +
+        "var ns$Foo$EventType$A=1;" +
+        "var ns$Foo$EventType$B=2;" +
+        "var ns$Bar=null;" +
+        "var ns$Foo$Other$X=1;" +
+        "var ns$Foo$Other$Y=2;" +
+        "var x=function(){use(ns$Foo$Other$X)};" +
+        "use(x)\n");
+  }
+
+  public void testGlobalAliasWithProperties4() {
+    testSame("" +
+        "var nullFunction = function(){};\n" +
+        "var blob = {};\n" +
+        "blob.init = nullFunction;\n" +
+        "use(blob)");
+  }
+
+  public void testGlobalAliasWithProperties5() {
+    testSame(
+        "/** @constructor */ var blob = function() {}",
+        "var nullFunction = function(){};\n" +
+        "blob.init = nullFunction;\n" +
+        "use(blob.init)",
+        null);
+  }
+
+  public void testLocalAliasOfEnumWithInstanceofCheck() {
+    test(
+        "/** @constructor */\n" +
+        "var Enums = function() {\n" +
+        "};\n" +
+        "\n" +
+        "/** @enum {number} */\n" +
+        "Enums.Fruit = {\n" +
+        " APPLE: 1,\n" +
+        " BANANA: 2,\n" +
+        "};\n" +
+        "\n" +
+        "function foo(f) {\n" +
+        " if (f instanceof Enums) { alert('what?'); return; }\n" +
+        "\n" +
+        " var Fruit = Enums.Fruit;\n" +
+        " if (f == Fruit.APPLE) alert('apple');\n" +
+        " if (f == Fruit.BANANA) alert('banana');\n" +
+        "}",
+        "var Enums = function() {};\n" +
+        "var Enums$Fruit$APPLE = 1;\n" +
+        "var Enums$Fruit$BANANA = 2;\n" +
+        "function foo(f) {\n" +
+        " if (f instanceof Enums) { alert('what?'); return; }\n" +
+        " var Fruit = null;\n" +
+        " if (f == Enums$Fruit$APPLE) alert('apple');\n" +
+        " if (f == Enums$Fruit$BANANA) alert('banana');\n" +
+        "}",
+        null);
+  }
+
+  public void testCollapsePropertiesOfClass1() {
+    test(
+        "/** @constructor */\n" +
+        "var namespace = function() {};\n" +
+        "goog.inherits(namespace, Object);\n" +
+        "\n" +
+        "namespace.includeExtraParam = true;\n" +
+        "\n" +
+        "/** @enum {number} */\n" +
+        "namespace.Param = {\n" +
+        "  param1: 1,\n" +
+        "  param2: 2\n" +
+        "};\n" +
+        "\n" +
+        "if (namespace.includeExtraParam) {\n" +
+        "  namespace.Param.optParam = 3;\n" +
+        "}\n" +
+        "\n" +
+        "function f() {\n" +
+        "  var Param = namespace.Param;\n" +
+        "  log(namespace.Param.optParam);\n" +
+        "  log(Param.optParam);\n" +
+        "}",
+        "var namespace = function() {};\n" +
+        "goog.inherits(namespace, Object);\n" +
+        "var namespace$includeExtraParam = true;\n" +
+        "var namespace$Param$param1 = 1;\n" +
+        "var namespace$Param$param2 = 2;\n" +
+        "if (namespace$includeExtraParam) {\n" +
+        "  var namespace$Param$optParam = 3;\n" +
+        "}\n" +
+        "function f() {\n" +
+        "  var Param = null;\n" +
+        "  log(namespace$Param$optParam);\n" +
+        "  log(namespace$Param$optParam);\n" +
+        "}");
+  }
+
+  public void testCollapsePropertiesOfClass2() {
+    test(
+        "var goog = goog || {};\n" +
+        "goog.addSingletonGetter = function(cls) {};\n" +
+        "\n" +
+        "var a = {};\n" +
+        "\n" +
+        "/** @constructor */\n" +
+        "a.b = function() {};\n" +
+        "goog.addSingletonGetter(a.b);\n" +
+        "a.b.prototype.get = function(key) {};\n" +
+        "\n" +
+        "/** @constructor */\n" +
+        "a.b.c = function() {};\n" +
+        "a.b.c.XXX = new a.b.c();\n" +
+        "\n" +
+        "function f() {\n" +
+        "  var x = a.b.getInstance();\n" +
+        "  var Key = a.b.c;\n" +
+        "  x.get(Key.XXX);\n" +
+        "}",
+
+        "var goog = goog || {};\n" +
+        "var goog$addSingletonGetter = function(cls) {};\n" +
+        "var a$b = function() {};\n" +
+        "goog$addSingletonGetter(a$b);\n" +
+        "a$b.prototype.get = function(key) {};\n" +
+        "var a$b$c = function() {};\n" +
+        "var a$b$c$XXX = new a$b$c();\n" +
+        "\n" +
+        "function f() {\n" +
+        "  var x = a$b.getInstance();\n" +
+        "  var Key = null;\n" +
+        "  x.get(a$b$c$XXX);\n" +
+        "}");
+  }
+
+  public void testGlobalCatch() throws Exception {
+    testSame(
+        "try {" +
+        "  throw Error();" +
+        "} catch (e) {" +
+        "  console.log(e.name)" +
+        "}");
   }
 }

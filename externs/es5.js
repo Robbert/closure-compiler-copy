@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Closure Compiler Authors
+ * Copyright 2009 The Closure Compiler Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,44 +24,10 @@
  * @externs
  */
 
-/*
- * JSON API.
- */
-
 /**
- * @see http://es5.github.com/x15.12.html
- * @see https://developer.mozilla.org/En/Using_native_JSON
- */
-var JSON = {};
-
-/**
- * @param {string} text
- * @param {(function(string, *) : *)=} opt_reviver
- * @return {*}
- * @throws {Error}
- * @nosideeffects
- * @see http://es5.github.com/x15.12.html#x15.12.2
- * @see http://ejohn.org/blog/ecmascript-5-strict-mode-json-and-more/
- */
-JSON.parse = function(text, opt_reviver) {};
-
-/**
- * @param {*} value
- * @param {(Array.<string>|(function(string, *) : *)|null)=} opt_replacer
- * @param {(number|string)=} opt_space
- * @return {string}
- * @throws {Error}
- * @nosideeffects
- * @see http://es5.github.com/x15.12.html#x15.12.3
- * @see http://ejohn.org/blog/ecmascript-5-strict-mode-json-and-more/
- */
-JSON.stringify = function(value, opt_replacer, opt_space) {};
-
-
-/**
- * @param {Object} selfObj Specifies the object to which |this| should point
- *     when the function is run. If the value is null or undefined, it will
- *     default to the global object.
+ * @param {Object|undefined} selfObj Specifies the object to which |this| should
+ *     point when the function is run. If the value is null or undefined, it
+ *     will default to the global object.
  * @param {...*} var_args Additional arguments that are partially
  *     applied to fn.
  * @return {!Function} A partially-applied form of the Function on which
@@ -73,6 +39,7 @@ Function.prototype.bind = function(selfObj, var_args) {};
 
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/String/Trim
@@ -81,6 +48,7 @@ String.prototype.trim = function() {};
 
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/String/TrimLeft
@@ -89,6 +57,7 @@ String.prototype.trimLeft = function() {};
 
 
 /**
+ * @this {String|string}
  * @return {string}
  * @nosideeffects
  * @see http://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/String/TrimRight
@@ -156,7 +125,7 @@ Object.defineProperties = function(obj, props) {};
 /**
  * @param {!Object} obj
  * @param {string} prop
- * @return {Object.<ObjectPropertyDescriptor>}
+ * @return {!ObjectPropertyDescriptor|undefined}
  * @nosideeffects
  * @see https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/Object/getOwnPropertyDescriptor
  */
@@ -165,7 +134,7 @@ Object.getOwnPropertyDescriptor = function(obj, prop) {};
 
 /**
  * @param {!Object} obj
- * @return {Array.<string>}
+ * @return {!Array.<string>}
  * @nosideeffects
  * @see https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/Object/keys
  */
@@ -174,7 +143,7 @@ Object.keys = function(obj) {};
 
 /**
  * @param {!Object} obj
- * @return {Array.<string>}
+ * @return {!Array.<string>}
  * @nosideeffects
  * @see https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/Object/getOwnPropertyNames
  */
@@ -266,3 +235,38 @@ Date.prototype.toISOString = function() {};
  * @override
  */
 Date.prototype.toJSON = function(opt_ignoredKey) {};
+
+
+/**
+ * A fake type to model the JSON object.
+ * @constructor
+ */
+var JSONType = function() {};
+
+
+/**
+ * @param {string} jsonStr The string to parse.
+ * @param {(function(string, *) : *)=} opt_reviver
+ * @return {*} The JSON object.
+ * @throws {Error}
+ * @nosideeffects
+ */
+JSONType.prototype.parse = function(jsonStr, opt_reviver) {};
+
+
+/**
+ * @param {*} jsonObj Input object.
+ * @param {(Array.<string>|(function(string, *) : *)|null)=} opt_replacer
+ * @param {(number|string)=} opt_space
+ * @return {string} JSON string which represents jsonObj.
+ * @throws {Error}
+ * @nosideeffects
+ */
+JSONType.prototype.stringify = function(jsonObj, opt_replacer, opt_space) {};
+
+
+/**
+ * @type {!JSONType}
+ * @suppress {duplicate}
+ */
+var JSON;

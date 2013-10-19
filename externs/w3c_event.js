@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Closure Compiler Authors
+ * Copyright 2008 The Closure Compiler Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -129,11 +129,13 @@ Event.prototype.preventDefault = function() {};
 Event.prototype.initEvent = function(eventTypeArg, canBubbleArg, cancelableArg) {};
 
 /**
+ * @param {string} eventType
+ * @param {Object=} opt_details
  * @constructor
  * @extends {Event}
  * @see http://www.w3.org/TR/DOM-Level-3-Events/#interface-CustomEvent
  */
-function CustomEvent() {}
+function CustomEvent(eventType, opt_details) {}
 
 /**
  * @param {string} eventType

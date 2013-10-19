@@ -31,6 +31,7 @@ import junit.framework.TestCase;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 /**
  * <p>Base class for testing JS compiler classes that change
@@ -65,6 +66,9 @@ public abstract class CompilerTestCase extends TestCase  {
   /** Error level reported by type checker. */
   private CheckLevel typeCheckLevel;
 
+  /** Whether to the test compiler pass before the type check. */
+  protected boolean runTypeCheckAfterProcessing = false;
+
   /** Whether the Normalize pass runs before pass being tested. */
   private boolean normalizeEnabled = false;
 
@@ -73,6 +77,9 @@ public abstract class CompilerTestCase extends TestCase  {
 
   /** Whether to check that all line number information is preserved. */
   private boolean checkLineNumbers = true;
+
+  /** Whether we expect parse warnings in the current test. */
+  private boolean expectParseWarningsThisTest = false;
 
   /**
    * An expected symbol table error. Only useful for testing the
@@ -84,6 +91,11 @@ public abstract class CompilerTestCase extends TestCase  {
    * Whether the MarkNoSideEffectsCalls pass runs before the pass being tested
    */
   private boolean markNoSideEffects = false;
+
+  /**
+   * Whether the PureFunctionIdentifier pass runs before the pass being tested
+   */
+  private boolean computeSideEffects = false;
 
   /** The most recently used Compiler instance. */
   private Compiler lastCompiler;
@@ -142,6 +154,11 @@ public abstract class CompilerTestCase extends TestCase  {
    */
   protected CompilerTestCase() {
     this("", true);
+  }
+
+  @Override protected void tearDown() throws Exception {
+    super.tearDown();
+    expectParseWarningsThisTest = false;
   }
 
   /**
@@ -297,8 +314,18 @@ public abstract class CompilerTestCase extends TestCase  {
    *
    * @see MarkNoSideEffectCalls
    */
+  // TODO(nicksantos): This pass doesn't get run anymore. It should be removed.
   void enableMarkNoSideEffects() {
     markNoSideEffects  = true;
+  }
+
+  /**
+   * Run the PureFunctionIdentifier pass before running the test pass.
+   *
+   * @see MarkNoSideEffectCalls
+   */
+  void enableComputeSideEffects() {
+    computeSideEffects  = true;
   }
 
   /**
@@ -308,6 +335,11 @@ public abstract class CompilerTestCase extends TestCase  {
     astValidationEnabled = validate;
   }
 
+  /** Whether we should ignore parse warnings for the current test method. */
+  protected void setExpectParseWarningsThisTest() {
+    expectParseWarningsThisTest = true;
+  }
+
   /** Returns a newly created TypeCheck. */
   private static TypeCheck createTypeCheck(Compiler compiler,
       CheckLevel level) {
@@ -315,8 +347,7 @@ public abstract class CompilerTestCase extends TestCase  {
         new SemanticReverseAbstractInterpreter(compiler.getCodingConvention(),
             compiler.getTypeRegistry());
 
-    return new TypeCheck(compiler, rai, compiler.getTypeRegistry(),
-        level, CheckLevel.OFF);
+    return new TypeCheck(compiler, rai, compiler.getTypeRegistry(), level);
   }
 
   /**
@@ -722,7 +753,6 @@ public abstract class CompilerTestCase extends TestCase  {
     test(compiler, expected, error, warning, null);
   }
 
-
   /**
    * Verifies that the compiler pass's JS output matches the expected output
    * and (optionally) that an expected warning is issued. Or, if an error is
@@ -740,12 +770,17 @@ public abstract class CompilerTestCase extends TestCase  {
   private void test(Compiler compiler, String[] expected,
                     DiagnosticType error, DiagnosticType warning,
                     String description) {
-    CodeChangeHandler recentChange = new  CodeChangeHandler();
+    RecentChange recentChange = new RecentChange();
     compiler.addChangeHandler(recentChange);
 
     Node root = compiler.parseInputs();
     assertTrue("Unexpected parse error(s): " +
         Joiner.on("\n").join(compiler.getErrors()), root != null);
+    if (!expectParseWarningsThisTest) {
+      assertTrue("Unexpected parse warnings(s): " +
+          Joiner.on("\n").join(compiler.getWarnings()),
+          compiler.getWarnings().length == 0);
+    }
 
     if (astValidationEnabled) {
       (new AstValidator()).validateRoot(root);
@@ -757,6 +792,7 @@ public abstract class CompilerTestCase extends TestCase  {
     Node rootClone = root.cloneTree();
     Node externsRootClone = rootClone.getFirstChild();
     Node mainRootClone = rootClone.getLastChild();
+    Map<Node, Node> mtoc = NodeUtil.mapMainToClone(mainRoot, mainRootClone);
 
     int numRepetitions = getNumRepetitions();
     ErrorManager[] errorManagers = new ErrorManager[numRepetitions];
@@ -783,7 +819,7 @@ public abstract class CompilerTestCase extends TestCase  {
         // Running it twice can cause unpredictable behavior because duplicate
         // objects for the same type are created, and the type system
         // uses reference equality to compare many types.
-        if (typeCheckEnabled && i == 0) {
+        if (!runTypeCheckAfterProcessing && typeCheckEnabled && i == 0) {
           TypeCheck check = createTypeCheck(compiler, typeCheckLevel);
           check.processForTesting(externsRoot, mainRoot);
         }
@@ -791,6 +827,12 @@ public abstract class CompilerTestCase extends TestCase  {
         // Only run the normalize pass once, if asked.
         if (normalizeEnabled && i == 0) {
           normalizeActualCode(compiler, externsRoot, mainRoot);
+        }
+
+        if (computeSideEffects && i == 0) {
+          PureFunctionIdentifier.Driver mark =
+              new PureFunctionIdentifier.Driver(compiler, null, false);
+          mark.process(externsRoot, mainRoot);
         }
 
         if (markNoSideEffects && i == 0) {
@@ -806,6 +848,11 @@ public abstract class CompilerTestCase extends TestCase  {
         }
         if (checkLineNumbers) {
           (new LineNumberCheck(compiler)).process(externsRoot, mainRoot);
+        }
+
+        if (runTypeCheckAfterProcessing && typeCheckEnabled && i == 0) {
+          TypeCheck check = createTypeCheck(compiler, typeCheckLevel);
+          check.processForTesting(externsRoot, mainRoot);
         }
 
         hasCodeChanged = hasCodeChanged || recentChange.hasCodeChanged();
@@ -881,7 +928,7 @@ public abstract class CompilerTestCase extends TestCase  {
       boolean codeChange = !mainRootClone.isEquivalentTo(mainRoot);
       boolean externsChange = !externsRootClone.isEquivalentTo(externsRoot);
 
-      // Generally, externs should not be change by the compiler passes.
+      // Generally, externs should not be changed by the compiler passes.
       if (externsChange && !allowExternsChanges) {
         String explanation = externsRootClone.checkTreeEquals(externsRoot);
         fail("Unexpected changes to externs" +
@@ -896,9 +943,13 @@ public abstract class CompilerTestCase extends TestCase  {
             "even though nothing changed",
             hasCodeChanged);
       } else {
-        assertTrue("compiler.reportCodeChange() should have been called",
-            hasCodeChanged);
+        assertTrue("compiler.reportCodeChange() should have been called."
+            + "\nOriginal: " + mainRootClone.toStringTree()
+            + "\nNew: " + mainRoot.toStringTree(), hasCodeChanged);
       }
+
+      // Check correctness of the changed-scopes-only traversal
+      NodeUtil.verifyScopeChanges(mtoc, mainRoot, false, compiler);
 
       if (expected != null) {
         if (compareAsTree) {
@@ -914,7 +965,8 @@ public abstract class CompilerTestCase extends TestCase  {
 
       // Verify normalization is not invalidated.
       Node normalizeCheckRootClone = root.cloneTree();
-      Node normalizeCheckExternsRootClone = normalizeCheckRootClone.getFirstChild();
+      Node normalizeCheckExternsRootClone =
+          normalizeCheckRootClone.getFirstChild();
       Node normalizeCheckMainRootClone = normalizeCheckRootClone.getLastChild();
       new PrepareAst(compiler).process(
           normalizeCheckExternsRootClone, normalizeCheckMainRootClone);
@@ -987,6 +1039,38 @@ public abstract class CompilerTestCase extends TestCase  {
       normalize.process(externsRoot, mainRoot);
     }
     return mainRoot;
+  }
+
+  protected void testExternChanges(
+      String input, String expectedExtern) {
+    testExternChanges("", input, expectedExtern);
+  }
+
+  protected void testExternChanges(
+      String extern, String input, String expectedExtern) {
+    Compiler compiler = createCompiler();
+    CompilerOptions options = getOptions();
+    compiler.init(
+        ImmutableList.of(SourceFile.fromCode("extern", extern)),
+        ImmutableList.of(SourceFile.fromCode("input", input)),
+        options);
+    compiler.parseInputs();
+    assertFalse(compiler.hasErrors());
+
+    Node externsAndJs = compiler.getRoot();
+    Node root = externsAndJs.getLastChild();
+
+    Node externs = externsAndJs.getFirstChild();
+
+    Node expected = compiler.parseTestCode(expectedExtern);
+    assertFalse(compiler.hasErrors());
+
+    (getProcessor(compiler)).process(externs, root);
+
+    String externsCode = compiler.toSource(externs);
+    String expectedCode = compiler.toSource(expected);
+
+    assertEquals(expectedCode, externsCode);
   }
 
   protected Node parseExpectedJs(String expected) {

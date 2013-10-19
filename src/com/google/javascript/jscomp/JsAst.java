@@ -17,14 +17,12 @@
 package com.google.javascript.jscomp;
 
 import com.google.common.base.Preconditions;
-
 import com.google.javascript.jscomp.parsing.ParserRunner;
-
 import com.google.javascript.rhino.IR;
 import com.google.javascript.rhino.InputId;
 import com.google.javascript.rhino.Node;
-import java.io.IOException;
 
+import java.io.IOException;
 import java.util.logging.Logger;
 
 /**
@@ -44,6 +42,11 @@ public class JsAst implements SourceAst {
     this.inputId = new InputId(sourceFile.getName());
     this.sourceFile = sourceFile;
     this.fileName = sourceFile.getName();
+  }
+
+  public JsAst(Node script) {
+    this(new SourceFile(script.getSourceFileName()));
+    this.root = script;
   }
 
   @Override
@@ -81,8 +84,8 @@ public class JsAst implements SourceAst {
   }
 
   private void parse(AbstractCompiler compiler) {
+    int startErrorCount = compiler.getErrorManager().getErrorCount();
     try {
-      logger_.fine("Parsing: " + sourceFile.getName());
       ParserRunner.ParseResult result = ParserRunner.parse(sourceFile, sourceFile.getCode(),
           compiler.getParserConfig(),
           compiler.getDefaultErrorReporter(),
@@ -94,7 +97,12 @@ public class JsAst implements SourceAst {
           JSError.make(AbstractCompiler.READ_ERROR, sourceFile.getName()));
     }
 
-    if (root == null || compiler.hasHaltingErrors()) {
+
+    if (root == null ||
+        // Most passes try to report as many errors as possible,
+        // so there may already be errors. We only care if there were
+        // errors in the code we just parsed.
+        (compiler.getErrorManager().getErrorCount() > startErrorCount && !compiler.isIdeMode())) {
       // There was a parse error or IOException, so use a dummy block.
       root = IR.script();
     } else {

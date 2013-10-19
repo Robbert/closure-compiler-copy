@@ -369,6 +369,15 @@ public class TypeInferenceTest extends TestCase {
     verify("out3", OBJECT_TYPE);
   }
 
+  public void testAssert11() {
+    JSType startType = createNullableType(OBJECT_TYPE);
+    assuming("x", startType);
+    assuming("y", startType);
+    inFunction("var z = goog.asserts.assert(x || y);");
+    verify("x", startType);
+    verify("y", startType);
+  }
+
   public void testAssertNumber() {
     JSType startType = createNullableType(ALL_TYPE);
     assuming("x", startType);
@@ -416,6 +425,14 @@ public class TypeInferenceTest extends TestCase {
     inFunction("out1 = x; goog.asserts.assertObject(x); out2 = x;");
     verify("out1", startType);
     verifySubtypeOf("out2", OBJECT_TYPE);
+  }
+
+  public void testAssertElement() {
+    JSType elementType = registry.createObjectType("Element", null,
+        registry.getNativeObjectType(OBJECT_TYPE));
+    assuming("x", elementType);
+    inFunction("out1 = x; goog.asserts.assertElement(x); out2 = x;");
+    verify("out1", elementType);
   }
 
   public void testAssertObject2() {
@@ -684,6 +701,38 @@ public class TypeInferenceTest extends TestCase {
             registry.getNativeType(JSTypeNative.U2U_CONSTRUCTOR_TYPE)));
     inFunction("var y = new x();");
     verify("y", UNKNOWN_TYPE);
+  }
+
+  public void testNew2() {
+    inFunction(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @param {T} x\n" +
+        " * @template T\n" +
+        " */" +
+        "function F(x) {}\n" +
+        "var x = /** @type {!Array.<number>} */ ([]);\n" +
+        "var result = new F(x);");
+
+    assertEquals("F.<Array.<number>>", getType("result").toString());
+  }
+
+  public void testNew3() {
+    inFunction(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @param {Array.<T>} x\n" +
+        " * @param {T} y\n" +
+        " * @param {S} z\n" +
+        " * @template T,S\n" +
+        " */" +
+        "function F(x,y,z) {}\n" +
+        "var x = /** @type {!Array.<number>} */ ([]);\n" +
+        "var y = /** @type {string} */ ('foo');\n" +
+        "var z = /** @type {boolean} */ (true);\n" +
+        "var result = new F(x,y,z);");
+
+    assertEquals("F.<(number|string),boolean>", getType("result").toString());
   }
 
   public void testInnerFunction1() {

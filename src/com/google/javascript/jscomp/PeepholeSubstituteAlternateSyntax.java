@@ -18,13 +18,11 @@ package com.google.javascript.jscomp;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
 import com.google.javascript.jscomp.CodingConvention.Bind;
 import com.google.javascript.rhino.IR;
 import com.google.javascript.rhino.Node;
 import com.google.javascript.rhino.Token;
-import com.google.javascript.rhino.jstype.TernaryValue;
 
 import java.util.regex.Pattern;
 
@@ -37,29 +35,18 @@ import java.util.regex.Pattern;
 class PeepholeSubstituteAlternateSyntax
   extends AbstractPeepholeOptimization {
 
-  private static final int AND_PRECEDENCE = NodeUtil.precedence(Token.AND);
-  private static final int OR_PRECEDENCE = NodeUtil.precedence(Token.OR);
-  private static final int NOT_PRECEDENCE = NodeUtil.precedence(Token.NOT);
   private static final CodeGenerator REGEXP_ESCAPER =
       CodeGenerator.forCostEstimation(
           null /* blow up if we try to produce code */);
 
   private final boolean late;
 
-  private final int STRING_SPLIT_OVERHEAD = ".split('.')".length();
+  private static final int STRING_SPLIT_OVERHEAD = ".split('.')".length();
 
   static final DiagnosticType INVALID_REGULAR_EXPRESSION_FLAGS =
     DiagnosticType.warning(
         "JSC_INVALID_REGULAR_EXPRESSION_FLAGS",
         "Invalid flags to RegExp constructor: {0}");
-
-  static final Predicate<Node> DONT_TRAVERSE_FUNCTIONS_PREDICATE
-      = new Predicate<Node>() {
-    @Override
-    public boolean apply(Node input) {
-      return !input.isFunction();
-    }
-  };
 
   /**
    * @param late When late is false, this mean we are currently running before
@@ -79,57 +66,6 @@ class PeepholeSubstituteAlternateSyntax
   @SuppressWarnings("fallthrough")
   public Node optimizeSubtree(Node node) {
     switch(node.getType()) {
-      case Token.RETURN: {
-        Node result = tryRemoveRedundantExit(node);
-        if (result != node) {
-          return result;
-        }
-        result = tryReplaceExitWithBreak(node);
-        if (result != node) {
-          return result;
-        }
-        return tryReduceReturn(node);
-      }
-
-      case Token.THROW: {
-        Node result = tryRemoveRedundantExit(node);
-        if (result != node) {
-          return result;
-        }
-        return tryReplaceExitWithBreak(node);
-      }
-
-      // TODO(johnlenz): Maybe remove redundant BREAK and CONTINUE. Overlaps
-      // with MinimizeExitPoints.
-
-      case Token.NOT:
-        tryMinimizeCondition(node.getFirstChild());
-        return tryMinimizeNot(node);
-
-      case Token.IF:
-        tryMinimizeCondition(node.getFirstChild());
-        return tryMinimizeIf(node);
-
-      case Token.EXPR_RESULT:
-        tryMinimizeCondition(node.getFirstChild());
-        return node;
-
-      case Token.HOOK:
-        tryMinimizeCondition(node.getFirstChild());
-        return node;
-
-      case Token.WHILE:
-      case Token.DO:
-        tryMinimizeCondition(NodeUtil.getConditionExpression(node));
-        return node;
-
-      case Token.FOR:
-        if (!NodeUtil.isForIn(node)) {
-          tryJoinForCondition(node);
-          tryMinimizeCondition(NodeUtil.getConditionExpression(node));
-        }
-        return node;
-
       case Token.TRUE:
       case Token.FALSE:
         return reduceTrueFalse(node);
@@ -151,61 +87,69 @@ class PeepholeSubstituteAlternateSyntax
         }
         return result;
 
+      case Token.RETURN:
+        return tryReduceReturn(node);
+
       case Token.COMMA:
         return trySplitComma(node);
 
       case Token.NAME:
         return tryReplaceUndefined(node);
 
-      case Token.BLOCK:
-        return tryReplaceIf(node);
-
       case Token.ARRAYLIT:
         return tryMinimizeArrayLiteral(node);
+
+      case Token.MUL:
+      case Token.AND:
+      case Token.OR:
+      case Token.BITOR:
+      case Token.BITXOR:
+      case Token.BITAND:
+        return tryRotateAssociativeOperator(node);
 
       default:
         return node; //Nothing changed
     }
   }
 
-  private void tryJoinForCondition(Node n) {
+  private Node tryRotateAssociativeOperator(Node n) {
     if (!late) {
-      return;
+      return n;
     }
-
-    Node block = n.getLastChild();
-    Node maybeIf = block.getFirstChild();
-    if (maybeIf != null && maybeIf.isIf()) {
-      Node maybeBreak = maybeIf.getChildAtIndex(1).getFirstChild();
-      if (maybeBreak != null && maybeBreak.isBreak()
-          && !maybeBreak.hasChildren()) {
-
-        // Preserve the IF ELSE expression is there is one.
-        if (maybeIf.getChildCount() == 3) {
-          block.replaceChild(maybeIf,
-              maybeIf.getLastChild().detachFromParent());
-        } else {
-          block.removeFirstChild();
-        }
-
-        Node ifCondition = maybeIf.removeFirstChild();
-        Node fixedIfCondition = IR.not(ifCondition)
-            .srcref(ifCondition);
-
-        // OK, join the IF expression with the FOR expression
-        Node forCondition = NodeUtil.getConditionExpression(n);
-        if (forCondition.isEmpty()) {
-          n.replaceChild(forCondition, fixedIfCondition);
-        } else {
-          Node replacement = new Node(Token.AND);
-          n.replaceChild(forCondition, replacement);
-          replacement.addChildToBack(forCondition);
-          replacement.addChildToBack(fixedIfCondition);
-        }
-
+    // All commutative operators are also associative
+    Preconditions.checkArgument(NodeUtil.isAssociative(n.getType()));
+    Node rhs = n.getLastChild();
+    if (n.getType() == rhs.getType()) {
+      // Transform a * (b * c) to a * b * c
+      Node first = n.getFirstChild().detachFromParent();
+      Node second = rhs.getFirstChild().detachFromParent();
+      Node third = rhs.getLastChild().detachFromParent();
+      Node newLhs = new Node(n.getType(), first, second)
+          .copyInformationFrom(n);
+      Node newRoot = new Node(rhs.getType(), newLhs, third)
+          .copyInformationFrom(rhs);
+      n.getParent().replaceChild(n, newRoot);
+      reportCodeChange();
+      return newRoot;
+    } else if (NodeUtil.isCommutative(n.getType()) &&
+               !NodeUtil.mayHaveSideEffects(n)) {
+      // Transform a * (b / c) to b / c * a
+      Node lhs = n.getFirstChild();
+      while (lhs.getType() == n.getType()) {
+        lhs = lhs.getFirstChild();
+      }
+      int precedence = NodeUtil.precedence(n.getType());
+      int lhsPrecedence = NodeUtil.precedence(lhs.getType());
+      int rhsPrecedence = NodeUtil.precedence(rhs.getType());
+      if (rhsPrecedence == precedence && lhsPrecedence != precedence) {
+        n.removeChild(rhs);
+        lhs.getParent().replaceChild(lhs, rhs);
+        n.addChildToBack(lhs);
         reportCodeChange();
+        return n;
       }
     }
+    return n;
   }
 
   private Node tryFoldSimpleFunctionCall(Node n) {
@@ -301,100 +245,6 @@ class PeepholeSubstituteAlternateSyntax
   }
 
   /**
-   * Use "return x?1:2;" in place of "if(x)return 1;return 2;"
-   */
-  private Node tryReplaceIf(Node n) {
-
-    for (Node child = n.getFirstChild();
-         child != null; child = child.getNext()){
-      if (child.isIf()){
-        Node cond = child.getFirstChild();
-        Node thenBranch = cond.getNext();
-        Node elseBranch = thenBranch.getNext();
-        Node nextNode = child.getNext();
-
-        if (nextNode != null && elseBranch == null
-            && isReturnBlock(thenBranch)
-            && nextNode.isIf()) {
-          Node nextCond = nextNode.getFirstChild();
-          Node nextThen = nextCond.getNext();
-          Node nextElse = nextThen.getNext();
-          if (thenBranch.isEquivalentToTyped(nextThen)) {
-            // Transform
-            //   if (x) return 1; if (y) return 1;
-            // to
-            //   if (x||y) return 1;
-            child.detachFromParent();
-            child.detachChildren();
-            Node newCond = new Node(Token.OR, cond);
-            nextNode.replaceChild(nextCond, newCond);
-            newCond.addChildToBack(nextCond);
-            reportCodeChange();
-          } else if (nextElse != null
-              && thenBranch.isEquivalentToTyped(nextElse)) {
-            // Transform
-            //   if (x) return 1; if (y) foo() else return 1;
-            // to
-            //   if (!x&&y) foo() else return 1;
-            child.detachFromParent();
-            child.detachChildren();
-            Node newCond = new Node(Token.AND,
-                IR.not(cond).srcref(cond));
-            nextNode.replaceChild(nextCond, newCond);
-            newCond.addChildToBack(nextCond);
-            reportCodeChange();
-          }
-        } else if (nextNode != null && elseBranch == null &&
-            isReturnBlock(thenBranch) && isReturnExpression(nextNode)) {
-          Node thenExpr = null;
-          // if(x)return; return 1 -> return x?void 0:1
-          if (isReturnExpressBlock(thenBranch)) {
-            thenExpr = getBlockReturnExpression(thenBranch);
-            thenExpr.detachFromParent();
-          } else {
-            thenExpr = NodeUtil.newUndefinedNode(child);
-          }
-
-          Node elseExpr = nextNode.getFirstChild();
-
-          cond.detachFromParent();
-          elseExpr.detachFromParent();
-
-          Node returnNode = IR.returnNode(
-                                IR.hook(cond, thenExpr, elseExpr)
-                                    .srcref(child));
-          n.replaceChild(child, returnNode);
-          n.removeChild(nextNode);
-          reportCodeChange();
-        } else if (elseBranch != null && statementMustExitParent(thenBranch)) {
-          child.removeChild(elseBranch);
-          n.addChildAfter(elseBranch, child);
-          reportCodeChange();
-        }
-      }
-    }
-    return n;
-  }
-
-  private boolean statementMustExitParent(Node n) {
-    switch (n.getType()) {
-      case Token.THROW:
-      case Token.RETURN:
-        return true;
-      case Token.BLOCK:
-        if (n.hasChildren()) {
-          Node child = n.getLastChild();
-          return statementMustExitParent(child);
-        }
-        return false;
-      // TODO(johnlenz): handle TRY/FINALLY
-      case Token.FUNCTION:
-      default:
-        return false;
-    }
-  }
-
-  /**
    * Use "void 0" in place of "undefined"
    */
   private Node tryReplaceUndefined(Node n) {
@@ -435,892 +285,6 @@ class PeepholeSubstituteAlternateSyntax
           }
           break;
       }
-    }
-
-    return n;
-  }
-
-  /**
-   * Replace duplicate exits in control structures.  If the node following
-   * the exit node expression has the same effect as exit node, the node can
-   * be replaced or removed.
-   * For example:
-   *   "while (a) {return f()} return f();" ==> "while (a) {break} return f();"
-   *   "while (a) {throw 'ow'} throw 'ow';" ==> "while (a) {break} throw 'ow';"
-   *
-   * @param n An follow control exit expression (a THROW or RETURN node)
-   * @return The replacement for n, or the original if no change was made.
-   */
-  private Node tryReplaceExitWithBreak(Node n) {
-    Node result = n.getFirstChild();
-
-    // Find the enclosing control structure, if any, that a "break" would exit
-    // from.
-    Node breakTarget = n;
-    for (;!ControlFlowAnalysis.isBreakTarget(breakTarget, null /* no label */);
-        breakTarget = breakTarget.getParent()) {
-      if (breakTarget.isFunction() || breakTarget.isScript()) {
-        // No break target.
-        return n;
-      }
-    }
-
-    Node follow = ControlFlowAnalysis.computeFollowNode(breakTarget);
-
-    // Skip pass all the finally blocks because both the break and return will
-    // also trigger all the finally blocks. However, the order of execution is
-    // slightly changed. Consider:
-    //
-    // return a() -> finally { b() } -> return a()
-    //
-    // which would call a() first. However, changing the first return to a
-    // break will result in calling b().
-
-    Node prefinallyFollows = follow;
-    follow = skipFinallyNodes(follow);
-
-    if (prefinallyFollows != follow) {
-      // There were finally clauses
-      if (!isPure(result)) {
-        // Can't defer the exit
-        return n;
-      }
-    }
-
-    if (follow == null && (n.isThrow() || result != null)) {
-      // Can't complete remove a throw here or a return with a result.
-      return n;
-    }
-
-    // When follow is null, this mean the follow of a break target is the
-    // end of a function. This means a break is same as return.
-    if (follow == null || areMatchingExits(n, follow)) {
-      Node replacement = IR.breakNode();
-      n.getParent().replaceChild(n, replacement);
-      this.reportCodeChange();
-      return replacement;
-    }
-
-    return n;
-  }
-
-  /**
-   * Remove duplicate exits.  If the node following the exit node expression
-   * has the same effect as exit node, the node can be removed.
-   * For example:
-   *   "if (a) {return f()} return f();" ==> "if (a) {} return f();"
-   *   "if (a) {throw 'ow'} throw 'ow';" ==> "if (a) {} throw 'ow';"
-   *
-   * @param n An follow control exit expression (a THROW or RETURN node)
-   * @return The replacement for n, or the original if no change was made.
-   */
-  private Node tryRemoveRedundantExit(Node n) {
-    Node exitExpr = n.getFirstChild();
-
-    Node follow = ControlFlowAnalysis.computeFollowNode(n);
-
-    // Skip pass all the finally blocks because both the fall through and return
-    // will also trigger all the finally blocks.
-    Node prefinallyFollows = follow;
-    follow = skipFinallyNodes(follow);
-    if (prefinallyFollows != follow) {
-      // There were finally clauses
-      if (!isPure(exitExpr)) {
-        // Can't replace the return
-        return n;
-      }
-    }
-
-    if (follow == null && (n.isThrow() || exitExpr != null)) {
-      // Can't complete remove a throw here or a return with a result.
-      return n;
-    }
-
-    // When follow is null, this mean the follow of a break target is the
-    // end of a function. This means a break is same as return.
-    if (follow == null || areMatchingExits(n, follow)) {
-      n.detachFromParent();
-      reportCodeChange();
-      return null;
-    }
-
-    return n;
-  }
-
-  /**
-   * @return Whether the expression does not produces and can not be affected
-   * by side-effects.
-   */
-  boolean isPure(Node n) {
-    return n == null
-        || (!NodeUtil.canBeSideEffected(n)
-            && !mayHaveSideEffects(n));
-  }
-
-  /**
-   * @return n or the node following any following finally nodes.
-   */
-  Node skipFinallyNodes(Node n) {
-    while (n != null && NodeUtil.isTryFinallyNode(n.getParent(), n)) {
-      n = ControlFlowAnalysis.computeFollowNode(n);
-    }
-    return n;
-  }
-
-  /**
-   * Check whether one exit can be replaced with another. Verify:
-   * 1) They are identical expressions
-   * 2) If an exception is possible that the statements, the original
-   * and the potential replacement are in the same exception handler.
-   */
-  boolean areMatchingExits(Node nodeThis, Node nodeThat) {
-    return nodeThis.isEquivalentTo(nodeThat)
-        && (!isExceptionPossible(nodeThis)
-            || getExceptionHandler(nodeThis) == getExceptionHandler(nodeThat));
-  }
-
-  boolean isExceptionPossible(Node n) {
-    // TODO(johnlenz): maybe use ControlFlowAnalysis.mayThrowException?
-    Preconditions.checkState(n.isReturn()
-        || n.isThrow());
-    return n.isThrow()
-        || (n.hasChildren()
-            && !NodeUtil.isLiteralValue(n.getLastChild(), true));
-  }
-
-  Node getExceptionHandler(Node n) {
-    return ControlFlowAnalysis.getExceptionHandler(n);
-  }
-
-  /**
-   * Try to minimize NOT nodes such as !(x==y).
-   *
-   * Returns the replacement for n or the original if no change was made
-   */
-  private Node tryMinimizeNot(Node n) {
-    Node parent = n.getParent();
-
-    Node notChild = n.getFirstChild();
-    // negative operator of the current one : == -> != for instance.
-    int complementOperator;
-    switch (notChild.getType()) {
-      case Token.EQ:
-        complementOperator = Token.NE;
-        break;
-      case Token.NE:
-        complementOperator = Token.EQ;
-        break;
-      case Token.SHEQ:
-        complementOperator = Token.SHNE;
-        break;
-      case Token.SHNE:
-        complementOperator = Token.SHEQ;
-        break;
-      // GT, GE, LT, LE are not handled in this because !(x<NaN) != x>=NaN.
-      default:
-        return n;
-    }
-    Node newOperator = n.removeFirstChild();
-    newOperator.setType(complementOperator);
-    parent.replaceChild(n, newOperator);
-    reportCodeChange();
-    return newOperator;
-  }
-
-  /**
-   * Try turning IF nodes into smaller HOOKs
-   *
-   * Returns the replacement for n or the original if no replacement was
-   * necessary.
-   */
-  private Node tryMinimizeIf(Node n) {
-
-    Node parent = n.getParent();
-
-    Node cond = n.getFirstChild();
-
-    /* If the condition is a literal, we'll let other
-     * optimizations try to remove useless code.
-     */
-    if (NodeUtil.isLiteralValue(cond, true)) {
-      return n;
-    }
-
-    Node thenBranch = cond.getNext();
-    Node elseBranch = thenBranch.getNext();
-
-    if (elseBranch == null) {
-      if (isFoldableExpressBlock(thenBranch)) {
-        Node expr = getBlockExpression(thenBranch);
-        if (!late && isPropertyAssignmentInExpression(expr)) {
-          // Keep opportunities for CollapseProperties such as
-          // a.longIdentifier || a.longIdentifier = ... -> var a = ...;
-          // until CollapseProperties has been run.
-          return n;
-        }
-
-        if (cond.isNot()) {
-          // if(!x)bar(); -> x||bar();
-          if (isLowerPrecedenceInExpression(cond, OR_PRECEDENCE) &&
-              isLowerPrecedenceInExpression(expr.getFirstChild(),
-                  OR_PRECEDENCE)) {
-            // It's not okay to add two sets of parentheses.
-            return n;
-          }
-
-          Node or = IR.or(
-              cond.removeFirstChild(),
-              expr.removeFirstChild()).srcref(n);
-          Node newExpr = NodeUtil.newExpr(or);
-          parent.replaceChild(n, newExpr);
-          reportCodeChange();
-
-          return newExpr;
-        }
-
-        // if(x)foo(); -> x&&foo();
-        if (isLowerPrecedenceInExpression(cond, AND_PRECEDENCE) &&
-            isLowerPrecedenceInExpression(expr.getFirstChild(),
-                AND_PRECEDENCE)) {
-          // One additional set of parentheses is worth the change even if
-          // there is no immediate code size win. However, two extra pair of
-          // {}, we would have to think twice. (unless we know for sure the
-          // we can further optimize its parent.
-          return n;
-        }
-
-        n.removeChild(cond);
-        Node and = IR.and(cond, expr.removeFirstChild()).srcref(n);
-        Node newExpr = NodeUtil.newExpr(and);
-        parent.replaceChild(n, newExpr);
-        reportCodeChange();
-
-        return newExpr;
-      } else {
-
-        // Try to combine two IF-ELSE
-        if (NodeUtil.isStatementBlock(thenBranch) &&
-            thenBranch.hasOneChild()) {
-          Node innerIf = thenBranch.getFirstChild();
-
-          if (innerIf.isIf()) {
-            Node innerCond = innerIf.getFirstChild();
-            Node innerThenBranch = innerCond.getNext();
-            Node innerElseBranch = innerThenBranch.getNext();
-
-            if (innerElseBranch == null &&
-                 !(isLowerPrecedenceInExpression(cond, AND_PRECEDENCE) &&
-                   isLowerPrecedenceInExpression(innerCond, AND_PRECEDENCE))) {
-              n.detachChildren();
-              n.addChildToBack(
-                  IR.and(
-                      cond,
-                      innerCond.detachFromParent())
-                      .srcref(cond));
-              n.addChildrenToBack(innerThenBranch.detachFromParent());
-              reportCodeChange();
-              // Not worth trying to fold the current IF-ELSE into && because
-              // the inner IF-ELSE wasn't able to be folded into && anyways.
-              return n;
-            }
-          }
-        }
-      }
-
-      return n;
-    }
-
-    /* TODO(dcc) This modifies the siblings of n, which is undesirable for a
-     * peephole optimization. This should probably get moved to another pass.
-     */
-    tryRemoveRepeatedStatements(n);
-
-    // if(!x)foo();else bar(); -> if(x)bar();else foo();
-    // An additional set of curly braces isn't worth it.
-    if (cond.isNot() && !consumesDanglingElse(elseBranch)) {
-      n.replaceChild(cond, cond.removeFirstChild());
-      n.removeChild(thenBranch);
-      n.addChildToBack(thenBranch);
-      reportCodeChange();
-      return n;
-    }
-
-    // if(x)return 1;else return 2; -> return x?1:2;
-    if (isReturnExpressBlock(thenBranch) && isReturnExpressBlock(elseBranch)) {
-      Node thenExpr = getBlockReturnExpression(thenBranch);
-      Node elseExpr = getBlockReturnExpression(elseBranch);
-      n.removeChild(cond);
-      thenExpr.detachFromParent();
-      elseExpr.detachFromParent();
-
-      // note - we ignore any cases with "return;", technically this
-      // can be converted to "return undefined;" or some variant, but
-      // that does not help code size.
-      Node returnNode = IR.returnNode(
-                            IR.hook(cond, thenExpr, elseExpr)
-                                .srcref(n));
-      parent.replaceChild(n, returnNode);
-      reportCodeChange();
-      return returnNode;
-    }
-
-    boolean thenBranchIsExpressionBlock = isFoldableExpressBlock(thenBranch);
-    boolean elseBranchIsExpressionBlock = isFoldableExpressBlock(elseBranch);
-
-    if (thenBranchIsExpressionBlock && elseBranchIsExpressionBlock) {
-      Node thenOp = getBlockExpression(thenBranch).getFirstChild();
-      Node elseOp = getBlockExpression(elseBranch).getFirstChild();
-      if (thenOp.getType() == elseOp.getType()) {
-        // if(x)a=1;else a=2; -> a=x?1:2;
-        if (NodeUtil.isAssignmentOp(thenOp)) {
-          Node lhs = thenOp.getFirstChild();
-          if (areNodesEqualForInlining(lhs, elseOp.getFirstChild()) &&
-              // if LHS has side effects, don't proceed [since the optimization
-              // evaluates LHS before cond]
-              // NOTE - there are some circumstances where we can
-              // proceed even if there are side effects...
-              !mayEffectMutableState(lhs)) {
-
-            n.removeChild(cond);
-            Node assignName = thenOp.removeFirstChild();
-            Node thenExpr = thenOp.removeFirstChild();
-            Node elseExpr = elseOp.getLastChild();
-            elseOp.removeChild(elseExpr);
-
-            Node hookNode = IR.hook(cond, thenExpr, elseExpr).srcref(n);
-            Node assign = new Node(thenOp.getType(), assignName, hookNode)
-                              .srcref(thenOp);
-            Node expr = NodeUtil.newExpr(assign);
-            parent.replaceChild(n, expr);
-            reportCodeChange();
-
-            return expr;
-          }
-        }
-      }
-      // if(x)foo();else bar(); -> x?foo():bar()
-      n.removeChild(cond);
-      thenOp.detachFromParent();
-      elseOp.detachFromParent();
-      Node expr = IR.exprResult(
-          IR.hook(cond, thenOp, elseOp).srcref(n));
-      parent.replaceChild(n, expr);
-      reportCodeChange();
-      return expr;
-    }
-
-    boolean thenBranchIsVar = isVarBlock(thenBranch);
-    boolean elseBranchIsVar = isVarBlock(elseBranch);
-
-    // if(x)var y=1;else y=2  ->  var y=x?1:2
-    if (thenBranchIsVar && elseBranchIsExpressionBlock &&
-        getBlockExpression(elseBranch).getFirstChild().isAssign()) {
-
-      Node var = getBlockVar(thenBranch);
-      Node elseAssign = getBlockExpression(elseBranch).getFirstChild();
-
-      Node name1 = var.getFirstChild();
-      Node maybeName2 = elseAssign.getFirstChild();
-
-      if (name1.hasChildren()
-          && maybeName2.isName()
-          && name1.getString().equals(maybeName2.getString())) {
-        Node thenExpr = name1.removeChildren();
-        Node elseExpr = elseAssign.getLastChild().detachFromParent();
-        cond.detachFromParent();
-        Node hookNode = IR.hook(cond, thenExpr, elseExpr)
-                            .srcref(n);
-        var.detachFromParent();
-        name1.addChildrenToBack(hookNode);
-        parent.replaceChild(n, var);
-        reportCodeChange();
-        return var;
-      }
-
-    // if(x)y=1;else var y=2  ->  var y=x?1:2
-    } else if (elseBranchIsVar && thenBranchIsExpressionBlock &&
-        getBlockExpression(thenBranch).getFirstChild().isAssign()) {
-
-      Node var = getBlockVar(elseBranch);
-      Node thenAssign = getBlockExpression(thenBranch).getFirstChild();
-
-      Node maybeName1 = thenAssign.getFirstChild();
-      Node name2 = var.getFirstChild();
-
-      if (name2.hasChildren()
-          && maybeName1.isName()
-          && maybeName1.getString().equals(name2.getString())) {
-        Node thenExpr = thenAssign.getLastChild().detachFromParent();
-        Node elseExpr = name2.removeChildren();
-        cond.detachFromParent();
-        Node hookNode = IR.hook(cond, thenExpr, elseExpr)
-                            .srcref(n);
-        var.detachFromParent();
-        name2.addChildrenToBack(hookNode);
-        parent.replaceChild(n, var);
-        reportCodeChange();
-
-        return var;
-      }
-    }
-
-    return n;
-  }
-
-  /**
-   * Try to remove duplicate statements from IF blocks. For example:
-   *
-   * if (a) {
-   *   x = 1;
-   *   return true;
-   * } else {
-   *   x = 2;
-   *   return true;
-   * }
-   *
-   * becomes:
-   *
-   * if (a) {
-   *   x = 1;
-   * } else {
-   *   x = 2;
-   * }
-   * return true;
-   *
-   * @param n The IF node to examine.
-   */
-  private void tryRemoveRepeatedStatements(Node n) {
-    Preconditions.checkState(n.isIf());
-
-    Node parent = n.getParent();
-    if (!NodeUtil.isStatementBlock(parent)) {
-      // If the immediate parent is something like a label, we
-      // can't move the statement, so bail.
-      return;
-    }
-
-    Node cond = n.getFirstChild();
-    Node trueBranch = cond.getNext();
-    Node falseBranch = trueBranch.getNext();
-    Preconditions.checkNotNull(trueBranch);
-    Preconditions.checkNotNull(falseBranch);
-
-    while (true) {
-      Node lastTrue = trueBranch.getLastChild();
-      Node lastFalse = falseBranch.getLastChild();
-      if (lastTrue == null || lastFalse == null
-          || !areNodesEqualForInlining(lastTrue, lastFalse)) {
-        break;
-      }
-      lastTrue.detachFromParent();
-      lastFalse.detachFromParent();
-      parent.addChildAfter(lastTrue, n);
-      reportCodeChange();
-    }
-  }
-
-  /**
-   * @return Whether the node is a block with a single statement that is
-   *     an expression.
-   */
-  private boolean isFoldableExpressBlock(Node n) {
-    if (n.isBlock()) {
-      if (n.hasOneChild()) {
-        Node maybeExpr = n.getFirstChild();
-        if (maybeExpr.isExprResult()) {
-          // IE has a bug where event handlers behave differently when
-          // their return value is used vs. when their return value is in
-          // an EXPR_RESULT. It's pretty freaking weird. See:
-          // http://code.google.com/p/closure-compiler/issues/detail?id=291
-          // We try to detect this case, and not fold EXPR_RESULTs
-          // into other expressions.
-          if (maybeExpr.getFirstChild().isCall()) {
-            Node calledFn = maybeExpr.getFirstChild().getFirstChild();
-
-            // We only have to worry about methods with an implicit 'this'
-            // param, or this doesn't happen.
-            if (calledFn.isGetElem()) {
-              return false;
-            } else if (calledFn.isGetProp() &&
-                       calledFn.getLastChild().getString().startsWith("on")) {
-              return false;
-            }
-          }
-
-          return true;
-        }
-        return false;
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * @return The expression node.
-   */
-  private Node getBlockExpression(Node n) {
-    Preconditions.checkState(isFoldableExpressBlock(n));
-    return n.getFirstChild();
-  }
-
-  /**
-   * @return Whether the node is a block with a single statement that is
-   *     an return with or without an expression.
-   */
-  private boolean isReturnBlock(Node n) {
-    if (n.isBlock()) {
-      if (n.hasOneChild()) {
-        Node first = n.getFirstChild();
-        return first.isReturn();
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * @return Whether the node is a block with a single statement that is
-   *     an return.
-   */
-  private boolean isReturnExpressBlock(Node n) {
-    if (n.isBlock()) {
-      if (n.hasOneChild()) {
-        Node first = n.getFirstChild();
-        if (first.isReturn()) {
-          return first.hasOneChild();
-        }
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * @return Whether the node is a single return statement.
-   */
-  private boolean isReturnExpression(Node n) {
-    if (n.isReturn()) {
-      return n.hasOneChild();
-    }
-    return false;
-  }
-
-  /**
-   * @return The expression that is part of the return.
-   */
-  private Node getBlockReturnExpression(Node n) {
-    Preconditions.checkState(isReturnExpressBlock(n));
-    return n.getFirstChild().getFirstChild();
-  }
-
-  /**
-   * @return Whether the node is a block with a single statement that is
-   *     a VAR declaration of a single variable.
-   */
-  private boolean isVarBlock(Node n) {
-    if (n.isBlock()) {
-      if (n.hasOneChild()) {
-        Node first = n.getFirstChild();
-        if (first.isVar()) {
-          return first.hasOneChild();
-        }
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * @return The var node.
-   */
-  private Node getBlockVar(Node n) {
-    Preconditions.checkState(isVarBlock(n));
-    return n.getFirstChild();
-  }
-
-  /**
-   * Does a statement consume a 'dangling else'? A statement consumes
-   * a 'dangling else' if an 'else' token following the statement
-   * would be considered by the parser to be part of the statement.
-   */
-  private boolean consumesDanglingElse(Node n) {
-    while (true) {
-      switch (n.getType()) {
-        case Token.IF:
-          if (n.getChildCount() < 3) {
-            return true;
-          }
-          // This IF node has no else clause.
-          n = n.getLastChild();
-          continue;
-        case Token.WITH:
-        case Token.WHILE:
-        case Token.FOR:
-          n = n.getLastChild();
-          continue;
-        default:
-          return false;
-      }
-    }
-  }
-
-  /**
-   * Does the expression contain an operator with lower precedence than
-   * the argument?
-   */
-  private boolean isLowerPrecedenceInExpression(Node n,
-      final int precedence) {
-    Predicate<Node> isLowerPrecedencePredicate = new Predicate<Node>() {
-      @Override
-      public boolean apply(Node input) {
-        return NodeUtil.precedence(input.getType()) < precedence;
-      }
-    };
-
-    return NodeUtil.has(n, isLowerPrecedencePredicate,
-        DONT_TRAVERSE_FUNCTIONS_PREDICATE);
-  }
-
-  /**
-   * Whether the node type has lower precedence than "precedence"
-   */
-  private boolean isLowerPrecedence(Node n, final int precedence) {
-    return NodeUtil.precedence(n.getType()) < precedence;
-  }
-
-  /**
-   * Whether the node type has higher precedence than "precedence"
-   */
-  private boolean isHigherPrecedence(Node n, final int precedence) {
-    return NodeUtil.precedence(n.getType()) > precedence;
-  }
-  /**
-   * Does the expression contain a property assignment?
-   */
-  private boolean isPropertyAssignmentInExpression(Node n) {
-    Predicate<Node> isPropertyAssignmentInExpressionPredicate =
-        new Predicate<Node>() {
-      @Override
-      public boolean apply(Node input) {
-        return (input.isGetProp() &&
-            input.getParent().isAssign());
-      }
-    };
-
-    return NodeUtil.has(n, isPropertyAssignmentInExpressionPredicate,
-        DONT_TRAVERSE_FUNCTIONS_PREDICATE);
-  }
-
-  /**
-   * Try to minimize conditions expressions, as there are additional
-   * assumptions that can be made when it is known that the final result
-   * is a boolean.
-   *
-   * The following transformations are done recursively:
-   *   !(x||y) --> !x&&!y
-   *   !(x&&y) --> !x||!y
-   *   !!x     --> x
-   * Thus:
-   *   !(x&&!y) --> !x||!!y --> !x||y
-   *
-   *   Returns the replacement for n, or the original if no change was made
-   */
-  private Node tryMinimizeCondition(Node n) {
-    Node parent = n.getParent();
-
-    switch (n.getType()) {
-      case Token.NOT:
-        Node first = n.getFirstChild();
-        switch (first.getType()) {
-          case Token.NOT: {
-              Node newRoot = first.removeFirstChild();
-              parent.replaceChild(n, newRoot);
-              reportCodeChange();
-              // No need to traverse, tryMinimizeCondition is called on the
-              // NOT children are handled below.
-              return newRoot;
-            }
-          case Token.AND:
-          case Token.OR: {
-              // !(!x && !y) --> x || y
-              // !(!x || !y) --> x && y
-              // !(!x && y) --> x || !y
-              // !(!x || y) --> x && !y
-              // !(x && !y) --> !x || y
-              // !(x || !y) --> !x && y
-              // !(x && y) --> !x || !y
-              // !(x || y) --> !x && !y
-              Node leftParent = first.getFirstChild();
-              Node rightParent = first.getLastChild();
-              Node left, right;
-
-              // Check special case when such transformation cannot reduce
-              // due to the added ()
-              // It only occurs when both of expressions are not NOT expressions
-              if (!leftParent.isNot()
-                  && !rightParent.isNot()) {
-                // If an expression has higher precedence than && or ||,
-                // but lower precedence than NOT, an additional () is needed
-                // Thus we do not preceed
-                int op_precedence = NodeUtil.precedence(first.getType());
-                if ((isLowerPrecedence(leftParent, NOT_PRECEDENCE)
-                    && isHigherPrecedence(leftParent, op_precedence))
-                    || (isLowerPrecedence(rightParent, NOT_PRECEDENCE)
-                    && isHigherPrecedence(rightParent, op_precedence))) {
-                  return n;
-                }
-              }
-
-              if (leftParent.isNot()) {
-                left = leftParent.removeFirstChild();
-              } else {
-                leftParent.detachFromParent();
-                left = IR.not(leftParent).srcref(leftParent);
-              }
-              if (rightParent.isNot()) {
-                right = rightParent.removeFirstChild();
-              } else {
-                rightParent.detachFromParent();
-                right = IR.not(rightParent).srcref(rightParent);
-              }
-
-              int newOp = (first.isAnd()) ? Token.OR : Token.AND;
-              Node newRoot = new Node(newOp, left, right);
-              parent.replaceChild(n, newRoot);
-              reportCodeChange();
-              // No need to traverse, tryMinimizeCondition is called on the
-              // AND and OR children below.
-              return newRoot;
-            }
-
-           default:
-             TernaryValue nVal = NodeUtil.getPureBooleanValue(first);
-             if (nVal != TernaryValue.UNKNOWN) {
-               boolean result = nVal.not().toBoolean(true);
-               int equivalentResult = result ? 1 : 0;
-               return maybeReplaceChildWithNumber(n, parent, equivalentResult);
-             }
-        }
-        // No need to traverse, tryMinimizeCondition is called on the NOT
-        // children in the general case in the main post-order traversal.
-        return n;
-
-      case Token.OR:
-      case Token.AND: {
-        Node left = n.getFirstChild();
-        Node right = n.getLastChild();
-
-        // Because the expression is in a boolean context minimize
-        // the children, this can't be done in the general case.
-        left = tryMinimizeCondition(left);
-        right = tryMinimizeCondition(right);
-
-        // Remove useless conditionals
-        // Handle four cases:
-        //   x || false --> x
-        //   x || true  --> true
-        //   x && true --> x
-        //   x && false  --> false
-        TernaryValue rightVal = NodeUtil.getPureBooleanValue(right);
-        if (NodeUtil.getPureBooleanValue(right) != TernaryValue.UNKNOWN) {
-          int type = n.getType();
-          Node replacement = null;
-          boolean rval = rightVal.toBoolean(true);
-
-          // (x || FALSE) => x
-          // (x && TRUE) => x
-          if (type == Token.OR && !rval ||
-              type == Token.AND && rval) {
-            replacement = left;
-          } else if (!mayHaveSideEffects(left)) {
-            replacement = right;
-          }
-
-          if (replacement != null) {
-            n.detachChildren();
-            parent.replaceChild(n, replacement);
-            reportCodeChange();
-            return replacement;
-          }
-        }
-        return n;
-      }
-
-      case Token.HOOK: {
-        Node condition = n.getFirstChild();
-        Node trueNode = n.getFirstChild().getNext();
-        Node falseNode = n.getLastChild();
-
-        // Because the expression is in a boolean context minimize
-        // the result children, this can't be done in the general case.
-        // The condition is handled in the general case in #optimizeSubtree
-        trueNode = tryMinimizeCondition(trueNode);
-        falseNode = tryMinimizeCondition(falseNode);
-
-        // Handle four cases:
-        //   x ? true : false --> x
-        //   x ? false : true --> !x
-        //   x ? true : y     --> x || y
-        //   x ? y : false    --> x && y
-        Node replacement = null;
-        TernaryValue trueNodeVal = NodeUtil.getPureBooleanValue(trueNode);
-        TernaryValue falseNodeVal = NodeUtil.getPureBooleanValue(falseNode);
-        if (trueNodeVal == TernaryValue.TRUE
-            && falseNodeVal == TernaryValue.FALSE) {
-          // Remove useless conditionals, keep the condition
-          condition.detachFromParent();
-          replacement = condition;
-        } else if (trueNodeVal == TernaryValue.FALSE
-            && falseNodeVal == TernaryValue.TRUE) {
-          // Remove useless conditionals, keep the condition
-          condition.detachFromParent();
-          replacement = IR.not(condition);
-        } else if (trueNodeVal == TernaryValue.TRUE) {
-          // Remove useless true case.
-          n.detachChildren();
-          replacement = IR.or(condition, falseNode);
-        } else if (falseNodeVal == TernaryValue.FALSE) {
-          // Remove useless false case
-          n.detachChildren();
-          replacement = IR.and(condition, trueNode);
-        }
-
-        if (replacement != null) {
-          parent.replaceChild(n, replacement);
-          n = replacement;
-          reportCodeChange();
-        }
-
-        return n;
-      }
-
-      default:
-        // while(true) --> while(1)
-        TernaryValue nVal = NodeUtil.getPureBooleanValue(n);
-        if (nVal != TernaryValue.UNKNOWN) {
-          boolean result = nVal.toBoolean(true);
-          int equivalentResult = result ? 1 : 0;
-          return maybeReplaceChildWithNumber(n, parent, equivalentResult);
-        }
-        // We can't do anything else currently.
-        return n;
-    }
-  }
-
-  /**
-   * Replaces a node with a number node if the new number node is not equivalent
-   * to the current node.
-   *
-   * Returns the replacement for n if it was replaced, otherwise returns n.
-   */
-  private Node maybeReplaceChildWithNumber(Node n, Node parent, int num) {
-    Node newNode = IR.number(num);
-    if (!newNode.isEquivalentTo(n)) {
-      parent.replaceChild(n, newNode);
-      reportCodeChange();
-
-      return newNode;
     }
 
     return n;
@@ -1423,7 +387,7 @@ class PeepholeSubstituteAlternateSyntax
    * at least two. The remaining case may be unsafe since Array(number)
    * actually reserves memory for an empty array which contains number elements.
    */
-  private FoldArrayAction isSafeToFoldArrayConstructor(Node arg) {
+  private static FoldArrayAction isSafeToFoldArrayConstructor(Node arg) {
     FoldArrayAction action = FoldArrayAction.NOT_SAFE_TO_FOLD;
 
     if (arg == null) {
@@ -1536,7 +500,7 @@ class PeepholeSubstituteAlternateSyntax
   }
 
   private Node tryMinimizeStringArrayLiteral(Node n) {
-    if(!late) {
+    if (!late) {
       return n;
     }
 
@@ -1576,7 +540,7 @@ class PeepholeSubstituteAlternateSyntax
    * @param strings The strings that must be separated.
    * @return a delimiter string or null
    */
-  private String pickDelimiter(String[] strings) {
+  private static String pickDelimiter(String[] strings) {
     boolean allLength1 = true;
     for (String s : strings) {
       if (s.length() != 1) {
@@ -1591,7 +555,7 @@ class PeepholeSubstituteAlternateSyntax
 
     String[] delimiters = new String[]{" ", ";", ",", "{", "}", null};
     int i = 0;
-    NEXT_DELIMITER: for (;delimiters[i] != null; i++) {
+    NEXT_DELIMITER: for (; delimiters[i] != null; i++) {
       for (String cur : strings) {
         if (cur.contains(delimiters[i])) {
           continue NEXT_DELIMITER;

@@ -16,7 +16,8 @@
 
 package com.google.javascript.jscomp;
 
-import com.google.common.collect.ImmutableList;
+import static com.google.javascript.jscomp.VarCheck.VAR_MULTIPLY_DECLARED_ERROR;
+
 import com.google.common.collect.Lists;
 import com.google.javascript.jscomp.NodeTraversal.AbstractPostOrderCallback;
 import com.google.javascript.rhino.Node;
@@ -29,7 +30,7 @@ public class VarCheckTest extends CompilerTestCase {
 
   private CheckLevel externValidationErrorLevel;
 
-  private CompilerPass testSetupPass;
+  private boolean declarationCheck;
 
   public VarCheckTest() {
     super(EXTERNS);
@@ -44,7 +45,7 @@ public class VarCheckTest extends CompilerTestCase {
     strictModuleDepErrorLevel = CheckLevel.OFF;
     externValidationErrorLevel = null;
     sanityCheck = false;
-    testSetupPass = null;
+    declarationCheck = false;
   }
 
   @Override
@@ -61,20 +62,17 @@ public class VarCheckTest extends CompilerTestCase {
 
   @Override
   protected CompilerPass getProcessor(final Compiler compiler) {
-    if (!sanityCheck) {
-      return new CompilerPass() {
-        @Override public void process(Node externs, Node root) {
-          if (testSetupPass != null) {
-            testSetupPass.process(externs, root);
-          }
-          new VarCheck(compiler, false).process(externs, root);
-          if (!compiler.hasErrors()) {
-            new VarCheck(compiler, true).process(externs, root);
-          }
+    return new CompilerPass() {
+      @Override public void process(Node externs, Node root) {
+        new VarCheck(compiler, sanityCheck).process(externs, root);
+        if (sanityCheck == false && !compiler.hasErrors()) {
+          new VarCheck(compiler, true).process(externs, root);
         }
-      };
-    }
-    return new VarCheck(compiler, sanityCheck);
+        if (declarationCheck) {
+          new VariableTestCheck(compiler).process(externs, root);
+        }
+      }
+    };
   }
 
   @Override
@@ -109,7 +107,7 @@ public class VarCheckTest extends CompilerTestCase {
 
   public void testMultiplyDeclaredVars1() {
     test("var x = 1; var x = 2;", null,
-         SyntacticScopeCreator.VAR_MULTIPLY_DECLARED_ERROR);
+        VarCheck.VAR_MULTIPLY_DECLARED_ERROR);
   }
 
   public void testMultiplyDeclaredVars2() {
@@ -120,12 +118,12 @@ public class VarCheckTest extends CompilerTestCase {
 
   public void testMultiplyDeclaredVars3() {
     test("try { var x = 1; x *=2; } catch (x) {}", null,
-         SyntacticScopeCreator.VAR_MULTIPLY_DECLARED_ERROR);
+         VarCheck.VAR_MULTIPLY_DECLARED_ERROR);
   }
 
   public void testMultiplyDeclaredVars4() {
     testSame("x;", "var x = 1; var x = 2;",
-         SyntacticScopeCreator.VAR_MULTIPLY_DECLARED_ERROR, true);
+        VarCheck.VAR_MULTIPLY_DECLARED_ERROR, true);
   }
 
   public void testVarReferenceInExterns() {
@@ -335,6 +333,45 @@ public class VarCheckTest extends CompilerTestCase {
         "x;", "function x() {}", "var x; x; ");
   }
 
+  public void testRedeclaration1() {
+     String js = "var a; var a;";
+     test(js, null, VarCheck.VAR_MULTIPLY_DECLARED_ERROR);
+  }
+
+  public void testRedeclaration2() {
+    String js = "var a; /** @suppress {duplicate} */ var a;";
+    testSame(js);
+  }
+
+  public void testRedeclaration3() {
+    String js = " /** @suppress {duplicate} */ var a; var a; ";
+    testSame(js);
+  }
+
+  public void testDuplicateVar() {
+    test("/** @define {boolean} */ var DEF = false; var DEF = true;",
+         null, VAR_MULTIPLY_DECLARED_ERROR);
+  }
+
+  public void testFunctionScopeArguments() {
+    // A var declaration doesn't mask arguments
+    testSame("function f() {var arguments}");
+
+    test("var f = function arguments() {}",
+        null, VarCheck.VAR_ARGUMENTS_SHADOWED_ERROR);
+    test("var f = function (arguments) {}",
+        null, VarCheck.VAR_ARGUMENTS_SHADOWED_ERROR);
+    test("function f() {try {} catch(arguments) {}}",
+        null, VarCheck.VAR_ARGUMENTS_SHADOWED_ERROR);
+  }
+
+  public void testNoUndeclaredVarWhenUsingClosurePass() {
+    enableClosurePass();
+    // We don't want to get goog as an undeclared var here.
+    test("goog.require('namespace.Class1');\n", null,
+        ProcessClosurePrimitives.MISSING_PROVIDE_ERROR);
+  }
+
   private final static class VariableTestCheck implements CompilerPass {
 
     final AbstractCompiler compiler;
@@ -365,35 +402,7 @@ public class VarCheckTest extends CompilerTestCase {
 
   public void checkSynthesizedExtern(
       String extern, String input, String expectedExtern) {
-    Compiler compiler = new Compiler();
-    CompilerOptions options = new CompilerOptions();
-    options.setWarningLevel(
-        DiagnosticGroup.forType(VarCheck.UNDEFINED_VAR_ERROR),
-        CheckLevel.OFF);
-    compiler.init(
-        ImmutableList.of(SourceFile.fromCode("extern", extern)),
-        ImmutableList.of(SourceFile.fromCode("input", input)),
-        options);
-    compiler.parseInputs();
-    assertFalse(compiler.hasErrors());
-
-    Node externsAndJs = compiler.getRoot();
-    Node root = externsAndJs.getLastChild();
-
-    Node externs = externsAndJs.getFirstChild();
-
-    Node expected = compiler.parseTestCode(expectedExtern);
-    assertFalse(compiler.hasErrors());
-
-    (new VarCheck(compiler, sanityCheck))
-        .process(externs, root);
-    if (!sanityCheck) {
-      (new VariableTestCheck(compiler)).process(externs, root);
-    }
-
-    String externsCode = compiler.toSource(externs);
-    String expectedCode = compiler.toSource(expected);
-
-    assertEquals(expectedCode, externsCode);
+    declarationCheck = !sanityCheck;
+    testExternChanges(extern, input, expectedExtern);
   }
 }

@@ -43,6 +43,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 import java.io.Serializable;
+import java.util.Arrays;
 
 /**
  * Manages a mapping from TemplateType to its resolved JSType. Provides utility
@@ -51,12 +52,22 @@ import java.io.Serializable;
  * @author izaakr@google.com (Izaak Rubin)
  */
 public class TemplateTypeMap implements Serializable {
-  private final ImmutableList<String> templateKeys;
+  // The TemplateType keys of the map.
+  private final ImmutableList<TemplateType> templateKeys;
+  // The JSType values, which are index-aligned with their corresponding keys.
+  // These values are left as specified in the TemplateTypeMap constructor; they
+  // may refer to TemplateTypes that are keys in this TemplateTypeMap, requiring
+  // iterative type resolution to find their true, resolved type.
   private final ImmutableList<JSType> templateValues;
+  // The JSType values, which are index-aligned with their corresponding keys.
+  // These values have been iteratively type-resolved using this TemplateTypeMap
+  // instance. These fully-resolved values are necessary for determining the
+  // equivalence of two TemplateTypeMap instances.
+  private final ImmutableList<JSType> resolvedTemplateValues;
   final JSTypeRegistry registry;
 
   TemplateTypeMap(JSTypeRegistry registry,
-                  ImmutableList<String> templateKeys,
+                  ImmutableList<TemplateType> templateKeys,
                   ImmutableList<JSType> templateValues) {
     Preconditions.checkNotNull(templateKeys);
     Preconditions.checkNotNull(templateValues);
@@ -67,12 +78,29 @@ public class TemplateTypeMap implements Serializable {
     int nKeys = templateKeys.size();
     this.templateValues = templateValues.size() > nKeys ?
         templateValues.subList(0, nKeys) : templateValues;
+
+    // Iteratively resolve any JSType values that refer to the TemplateType keys
+    // of this TemplateTypeMap.
+    TemplateTypeMapReplacer replacer = new TemplateTypeMapReplacer(
+        registry, this);
+    ImmutableList.Builder<JSType> builder = ImmutableList.builder();
+    for (JSType templateValue : this.templateValues) {
+      builder.add(templateValue.visit(replacer));
+    }
+    this.resolvedTemplateValues = builder.build();
+  }
+
+  /**
+   * Returns true if the map is empty; false otherwise.
+   */
+  public boolean isEmpty() {
+    return templateKeys.isEmpty();
   }
 
   /**
    * Returns a list of all template keys.
    */
-  public ImmutableList<String> getTemplateKeys() {
+  public ImmutableList<TemplateType> getTemplateKeys() {
     return templateKeys;
   }
 
@@ -80,8 +108,14 @@ public class TemplateTypeMap implements Serializable {
    * Returns true if this map contains the specified template key, false
    * otherwise.
    */
-  public boolean hasTemplateKey(String templateKey) {
-    return templateKeys.contains(templateKey);
+  public boolean hasTemplateKey(TemplateType templateKey) {
+    // Note: match by identity, not equality
+    for (TemplateType entry : templateKeys) {
+      if (entry == templateKey) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -96,7 +130,7 @@ public class TemplateTypeMap implements Serializable {
    * Returns a list of template keys in this map that do not have corresponding
    * JSType values.
    */
-  ImmutableList<String> getUnfilledTemplateKeys() {
+  ImmutableList<TemplateType> getUnfilledTemplateKeys() {
     return templateKeys.subList(templateValues.size(), templateKeys.size());
   }
 
@@ -104,30 +138,55 @@ public class TemplateTypeMap implements Serializable {
    * Returns true if there is a JSType value associated with the specified
    * template key; false otherwise.
    */
-  public boolean hasTemplateType(String key) {
-    return getTemplateTypeInternal(key) != null;
+  public boolean hasTemplateType(TemplateType key) {
+    return getTemplateTypeIndex(key) != -1;
   }
 
   /**
    * Returns the JSType value associated with the specified template key. If no
    * JSType value is associated, returns UNKNOWN_TYPE.
    */
-  public JSType getTemplateType(String key) {
-    JSType templateType = getTemplateTypeInternal(key);
-    return (templateType == null) ?
-        registry.getNativeType(JSTypeNative.UNKNOWN_TYPE) : templateType;
+  public JSType getTemplateType(TemplateType key) {
+    int index = getTemplateTypeIndex(key);
+    return (index == -1) ? registry.getNativeType(JSTypeNative.UNKNOWN_TYPE) :
+         templateValues.get(index);
+  }
+
+  public TemplateType getTemplateTypeKeyByName(String keyName) {
+    for (TemplateType key : templateKeys) {
+      if (key.getReferenceName().equals(keyName)) {
+        return key;
+      }
+    }
+    return null;
   }
 
   /**
-   * Returns the JSType value associated with the specified template key. If no
-   * JSType value is associated, returns null.
+   * Returns the index of the JSType value associated with the specified
+   * template key. If no JSType value is associated, returns -1.
    */
-  private JSType getTemplateTypeInternal(String key) {
-    int index = templateKeys.indexOf(key);
-    if (index < 0 || index >= templateValues.size()) {
-      return null;
+  private int getTemplateTypeIndex(TemplateType key) {
+    int maxIndex = Math.min(templateKeys.size(), templateValues.size());
+    for (int i = maxIndex - 1; i >= 0; i--) {
+      if (templateKeys.get(i) == key) {
+        return i;
+      }
     }
-    return templateValues.get(index);
+    return -1;
+  }
+
+  private JSType getResolvedTemplateType(TemplateType key) {
+    int index = getTemplateTypeIndex(key);
+    return (index == -1) ? registry.getNativeType(JSTypeNative.UNKNOWN_TYPE) :
+         resolvedTemplateValues.get(index);
+  }
+
+  /**
+   * An enum tracking the three different equivalence match states for a
+   * template key-value pair.
+   */
+  private enum EquivalenceMatch {
+    NO_KEY_MATCH, VALUE_MISMATCH, VALUE_MATCH
   }
 
   /**
@@ -136,37 +195,82 @@ public class TemplateTypeMap implements Serializable {
    */
   public boolean checkEquivalenceHelper(
       TemplateTypeMap that, EquivalenceMethod eqMethod) {
-    int thisNumKeys = templateKeys.size();
-    int thatNumKeys = that.getTemplateKeys().size();
+    ImmutableList<TemplateType> thisKeys = getTemplateKeys();
+    ImmutableList<TemplateType> thatKeys = that.getTemplateKeys();
 
-    for (int i = 0; i < Math.min(thisNumKeys, thatNumKeys); i++) {
-      JSType thisTemplateType = getTemplateType(templateKeys.get(i));
-      JSType thatTemplateType = that.getTemplateType(
-          that.getTemplateKeys().get(i));
-      if (!thisTemplateType.checkEquivalenceHelper(
-          thatTemplateType, eqMethod)) {
+    EquivalenceMatch[] thatMatches = new EquivalenceMatch[thatKeys.size()];
+    Arrays.fill(thatMatches, EquivalenceMatch.NO_KEY_MATCH);
+
+    for (int i = 0; i < thisKeys.size(); i++) {
+      TemplateType thisKey = thisKeys.get(i);
+      JSType thisType = getResolvedTemplateType(thisKey);
+      EquivalenceMatch thisMatch = EquivalenceMatch.NO_KEY_MATCH;
+
+      for (int j = 0; j < thatKeys.size(); j++) {
+        TemplateType thatKey = thatKeys.get(j);
+        JSType thatType = that.getResolvedTemplateType(thatKey);
+
+        // Cross-compare every key-value pair in this TemplateTypeMap with
+        // those in that TemplateTypeMap. Update the Equivalence match for both
+        // key-value pairs involved.
+        if (thisKey == thatKey) {
+          EquivalenceMatch newMatchType = EquivalenceMatch.VALUE_MISMATCH;
+          if (thisType.checkEquivalenceHelper(thatType, eqMethod)) {
+            newMatchType = EquivalenceMatch.VALUE_MATCH;
+          }
+
+          if (thisMatch != EquivalenceMatch.VALUE_MATCH) {
+            thisMatch = newMatchType;
+          }
+          if (thatMatches[j] != EquivalenceMatch.VALUE_MATCH) {
+            thatMatches[j] = newMatchType;
+          }
+        }
+      }
+
+      if (failedEquivalenceCheck(thisMatch, eqMethod)) {
         return false;
       }
     }
 
-    return thisNumKeys == thatNumKeys ||
-        eqMethod == EquivalenceMethod.INVARIANT;
+    for (int i = 0; i < thatMatches.length; i++) {
+      if (failedEquivalenceCheck(thatMatches[i], eqMethod)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
-   * Returns a new TemplateTypeMap whose keys have been extended with the
-   * specified list.
+   * Determines if the specified EquivalenceMatch is considered a failing
+   * condition for an equivalence check, given the EquivalenceMethod used for
+   * the check.
    */
-  TemplateTypeMap extendKeys(ImmutableList<String> newKeys) {
+  private boolean failedEquivalenceCheck(
+      EquivalenceMatch eqMatch, EquivalenceMethod eqMethod) {
+    return eqMatch == EquivalenceMatch.VALUE_MISMATCH ||
+        (eqMatch == EquivalenceMatch.NO_KEY_MATCH &&
+         eqMethod != EquivalenceMethod.INVARIANT);
+  }
+
+  /**
+   * Extends this TemplateTypeMap with the contents of the specified map.
+   * UNKNOWN_TYPE will be used as the value for any missing values in the
+   * specified map.
+   */
+  TemplateTypeMap extend(TemplateTypeMap thatMap) {
+    thatMap = thatMap.addUnknownValues();
     return registry.createTemplateTypeMap(
-        concatImmutableLists(templateKeys, newKeys), templateValues);
+        concatImmutableLists(thatMap.templateKeys, templateKeys),
+        concatImmutableLists(thatMap.templateValues, templateValues));
   }
 
   /**
    * Returns a new TemplateTypeMap whose values have been extended with the
    * specified list.
    */
-  TemplateTypeMap extendValues(ImmutableList<JSType> newValues) {
+  TemplateTypeMap addValues(ImmutableList<JSType> newValues) {
     // Ignore any new template values that will not align with an existing
     // template key.
     int numUnfilledKeys = numUnfilledTemplateKeys();
@@ -176,6 +280,23 @@ public class TemplateTypeMap implements Serializable {
 
     return registry.createTemplateTypeMap(
         templateKeys, concatImmutableLists(templateValues, newValues));
+  }
+
+  /**
+   * Returns a new TemplateTypeMap, where all unfilled values have been filled
+   * with UNKNOWN_TYPE.
+   */
+  private TemplateTypeMap addUnknownValues() {
+    int numUnfilledTemplateKeys = numUnfilledTemplateKeys();
+    if (numUnfilledTemplateKeys == 0) {
+      return this;
+    }
+
+    ImmutableList.Builder<JSType> builder = ImmutableList.builder();
+    for (int i = 0; i < numUnfilledTemplateKeys; i++) {
+      builder.add(registry.getNativeType(JSTypeNative.UNKNOWN_TYPE));
+    }
+    return addValues(builder.build());
   }
 
   /**
@@ -204,5 +325,26 @@ public class TemplateTypeMap implements Serializable {
       }
     }
     return false;
+  }
+
+  @Override
+  public String toString() {
+    String s = "";
+
+    int len = Math.max(Math.max(templateKeys.size(), templateValues.size()),
+        resolvedTemplateValues.size());
+    s += "{ ";
+    for (int i = 0; i < len; i++) {
+      s += "(";
+      s += (i < templateKeys.size()) ? templateKeys.get(i) : "";
+      s += ",";
+      s += (i < templateValues.size()) ? templateValues.get(i) : "";
+      s += ",";
+      s += (i < resolvedTemplateValues.size()) ? resolvedTemplateValues.get(i) : "";
+      s += ") ";
+    }
+    s += "}";
+
+    return s;
   }
 }

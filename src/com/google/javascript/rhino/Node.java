@@ -102,7 +102,9 @@ public class Node implements Cloneable, Serializable {
                                   // See comments in IRFactory about this.
       INFERRED_FUNCTION  = 55,    // Marks a function whose parameter types
                                   // have been inferred.
-      LAST_PROP          = 55;
+      CHANGE_TIME        = 56,    // For passes that work only on changed funs.
+      REFLECTED_OBJECT   = 57,    // An object that's used for goog.object.reflect-style reflection.
+      LAST_PROP          = 57;    // Unused in the compiler, but keep for Rhino.
 
   public static final int   // flags for INCRDECR_PROP
       DECR_FLAG = 0x1,
@@ -134,8 +136,10 @@ public class Node implements Cloneable, Serializable {
         case LENGTH:    return "length";
         case SLASH_V:   return "slash_v";
         case INFERRED_FUNCTION:   return "inferred";
+        case CHANGE_TIME: return "change_time";
+        case REFLECTED_OBJECT: return "reflected_object";
         default:
-          throw new IllegalStateException("unexpect prop id " + propType);
+          throw new IllegalStateException("unexpected prop id " + propType);
       }
   }
 
@@ -164,14 +168,15 @@ public class Node implements Cloneable, Serializable {
     }
 
     @Override
-    boolean isEquivalentTo(Node node, boolean compareJsType, boolean recurse) {
-      boolean equivalent = super.isEquivalentTo(node, compareJsType, recurse);
-      if (equivalent) {
+    boolean isEquivalentTo(
+        Node node, boolean compareJsType, boolean recur, boolean shallow) {
+      boolean equiv = super.isEquivalentTo(node, compareJsType, recur, shallow);
+      if (equiv) {
         double thisValue = getDouble();
         double thatValue = ((NumberNode) node).getDouble();
         if (thisValue == thatValue) {
           // detect the difference between 0.0 and -0.0.
-          return (thisValue != 0.0) || (1/thisValue == 1/thatValue);
+          return (thisValue != 0.0) || (1 / thisValue == 1 / thatValue);
         }
       }
       return false;
@@ -222,8 +227,9 @@ public class Node implements Cloneable, Serializable {
     }
 
     @Override
-    boolean isEquivalentTo(Node node, boolean compareJsType, boolean recurse) {
-      return (super.isEquivalentTo(node, compareJsType, recurse)
+    boolean isEquivalentTo(
+        Node node, boolean compareJsType, boolean recur, boolean shallow) {
+      return (super.isEquivalentTo(node, compareJsType, recur, shallow)
           && this.str.equals(((StringNode) node).str));
     }
 
@@ -258,7 +264,7 @@ public class Node implements Cloneable, Serializable {
     int getIntValue();
   }
 
-  private static abstract class AbstractPropListItem
+  private abstract static class AbstractPropListItem
       implements PropListItem, Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -689,11 +695,14 @@ public class Node implements Cloneable, Serializable {
    */
   public void removeChild(Node child) {
     Node prev = getChildBefore(child);
-    if (prev == null)
-        first = first.next;
-    else
-        prev.next = child.next;
-    if (child == last) last = prev;
+    if (prev == null) {
+      first = first.next;
+    } else {
+      prev.next = child.next;
+    }
+    if (child == last) {
+      last = prev;
+    }
     child.next = null;
     child.parent = null;
   }
@@ -713,13 +722,14 @@ public class Node implements Cloneable, Serializable {
     newChild.next = child.next;
     newChild.parent = this;
     if (child == first) {
-        first = newChild;
+      first = newChild;
     } else {
-        Node prev = getChildBefore(child);
-        prev.next = newChild;
+      Node prev = getChildBefore(child);
+      prev.next = newChild;
     }
-    if (child == last)
-        last = newChild;
+    if (child == last) {
+      last = newChild;
+    }
     child.next = null;
     child.parent = null;
   }
@@ -740,8 +750,9 @@ public class Node implements Cloneable, Serializable {
     newChild.next = child.next;
     newChild.parent = this;
     prevChild.next = newChild;
-    if (child == last)
-        last = newChild;
+    if (child == last) {
+      last = newChild;
+    }
     child.next = null;
     child.parent = null;
   }
@@ -1221,7 +1232,7 @@ public class Node implements Cloneable, Serializable {
    * The iterator does not support the optional operation
    * {@link Iterator#remove()}.</p>
    *
-   * <p>To iterate over a node's siblings, one can write</p>
+   * <p>To iterate over a node's children, one can write</p>
    * <pre>Node n = ...;
    * for (Node child : n.children()) { ...</pre>
    */
@@ -1355,7 +1366,9 @@ public class Node implements Cloneable, Serializable {
 
         @Override
         public Node next() {
-          if (!hasNext()) throw new NoSuchElementException();
+          if (!hasNext()) {
+            throw new NoSuchElementException();
+          }
           Node n = cur;
           cur = cur.getParent();
           return n;
@@ -1391,9 +1404,9 @@ public class Node implements Cloneable, Serializable {
 
   public int getChildCount() {
     int c = 0;
-    for (Node n = first; n != null; n = n.next)
+    for (Node n = first; n != null; n = n.next) {
       c++;
-
+    }
     return c;
   }
 
@@ -1429,7 +1442,7 @@ public class Node implements Cloneable, Serializable {
    * testing. Returns null if the nodes are equivalent.
    */
   NodeMismatch checkTreeEqualsImpl(Node node2) {
-    if (!isEquivalentTo(node2, false, false)) {
+    if (!isEquivalentTo(node2, false, false, false)) {
       return new NodeMismatch(this, node2);
     }
 
@@ -1456,7 +1469,7 @@ public class Node implements Cloneable, Serializable {
    */
   NodeMismatch checkTreeTypeAwareEqualsImpl(Node node2) {
     // Do a non-recursive equivalents check.
-    if (!isEquivalentTo(node2, true, false)) {
+    if (!isEquivalentTo(node2, true, false, false)) {
       return new NodeMismatch(this, node2);
     }
 
@@ -1475,7 +1488,12 @@ public class Node implements Cloneable, Serializable {
 
   /** Returns true if this node is equivalent semantically to another */
   public boolean isEquivalentTo(Node node) {
-    return isEquivalentTo(node, false, true);
+    return isEquivalentTo(node, false, true, false);
+  }
+
+  /** Checks equivalence without going into inner functions */
+  public boolean isEquivalentToShallow(Node node) {
+    return isEquivalentTo(node, false, true, true);
   }
 
   /**
@@ -1483,16 +1501,18 @@ public class Node implements Cloneable, Serializable {
    * the types are equivalent.
    */
   public boolean isEquivalentToTyped(Node node) {
-    return isEquivalentTo(node, true, true);
+    return isEquivalentTo(node, true, true, false);
   }
 
   /**
    * @param compareJsType Whether to compare the JSTypes of the nodes.
-   * @param recurse Whether to compare the children of the current node, if
+   * @param recur Whether to compare the children of the current node, if
    *    not only the the count of the children are compared.
+   * @param shallow If true, the method doesn't recur into inner functions.
    * @return Whether this node is equivalent semantically to the provided node.
    */
-  boolean isEquivalentTo(Node node, boolean compareJsType, boolean recurse) {
+  boolean isEquivalentTo(
+      Node node, boolean compareJsType, boolean recur, boolean shallow) {
     if (type != node.getType()
         || getChildCount() != node.getChildCount()
         || this.getClass() != node.getClass()) {
@@ -1529,12 +1549,13 @@ public class Node implements Cloneable, Serializable {
       }
     }
 
-    if (recurse) {
+    if (recur) {
       Node n, n2;
       for (n = first, n2 = node.first;
            n != null;
            n = n.next, n2 = n2.next) {
-        if (!n.isEquivalentTo(n2, compareJsType, true)) {
+        if (!n.isEquivalentTo(
+            n2, compareJsType, !(shallow && n.isFunction()), shallow)) {
           return false;
         }
       }
@@ -1664,7 +1685,9 @@ public class Node implements Cloneable, Serializable {
 
     Node child = prev.next;
     prev.next = child.next;
-    if (child == last) last = prev;
+    if (child == last) {
+      last = prev;
+    }
     child.next = null;
     child.parent = null;
     return child;
@@ -1865,6 +1888,16 @@ public class Node implements Cloneable, Serializable {
       return this;
   }
 
+  /** This node was last changed at {@code time} */
+  public void setChangeTime(int time) {
+    putIntProp(CHANGE_TIME, time);
+  }
+
+  /** Returns the time of the last change for this node */
+  public int getChangeTime() {
+    return getIntProp(CHANGE_TIME);
+  }
+
   /**
    * Sets whether this node is a variable length argument node. This
    * method is meaningful only on {@link Token#NAME} nodes
@@ -1968,16 +2001,16 @@ public class Node implements Cloneable, Serializable {
   // We want a value of 0 to mean "global state changes and
   // unknown locality of result".
 
-  final public static int FLAG_GLOBAL_STATE_UNMODIFIED = 1;
-  final public static int FLAG_THIS_UNMODIFIED = 2;
-  final public static int FLAG_ARGUMENTS_UNMODIFIED = 4;
-  final public static int FLAG_NO_THROWS = 8;
-  final public static int FLAG_LOCAL_RESULTS = 16;
+  public static final int FLAG_GLOBAL_STATE_UNMODIFIED = 1;
+  public static final int FLAG_THIS_UNMODIFIED = 2;
+  public static final int FLAG_ARGUMENTS_UNMODIFIED = 4;
+  public static final int FLAG_NO_THROWS = 8;
+  public static final int FLAG_LOCAL_RESULTS = 16;
 
-  final public static int SIDE_EFFECTS_FLAGS_MASK = 31;
+  public static final int SIDE_EFFECTS_FLAGS_MASK = 31;
 
-  final public static int SIDE_EFFECTS_ALL = 0;
-  final public static int NO_SIDE_EFFECTS =
+  public static final int SIDE_EFFECTS_ALL = 0;
+  public static final int NO_SIDE_EFFECTS =
     FLAG_GLOBAL_STATE_UNMODIFIED
     | FLAG_THIS_UNMODIFIED
     | FLAG_ARGUMENTS_UNMODIFIED
@@ -2027,13 +2060,15 @@ public class Node implements Cloneable, Serializable {
     }
 
     /** All side-effect occur and the returned results are non-local. */
-    public void setAllFlags() {
+    public SideEffectFlags setAllFlags() {
       value = Node.SIDE_EFFECTS_ALL;
+      return this;
     }
 
     /** No side-effects occur and the returned results are local. */
-    public void clearAllFlags() {
+    public SideEffectFlags clearAllFlags() {
       value = Node.NO_SIDE_EFFECTS | Node.FLAG_LOCAL_RESULTS;
+      return this;
     }
 
     public boolean areAllFlagsSet() {
@@ -2048,27 +2083,32 @@ public class Node implements Cloneable, Serializable {
       value |= Node.NO_SIDE_EFFECTS;
     }
 
-    public void setMutatesGlobalState() {
+    public SideEffectFlags setMutatesGlobalState() {
       // Modify global means everything must be assumed to be modified.
       removeFlag(Node.FLAG_GLOBAL_STATE_UNMODIFIED);
       removeFlag(Node.FLAG_ARGUMENTS_UNMODIFIED);
       removeFlag(Node.FLAG_THIS_UNMODIFIED);
+      return this;
     }
 
-    public void setThrows() {
+    public SideEffectFlags setThrows() {
       removeFlag(Node.FLAG_NO_THROWS);
+      return this;
     }
 
-    public void setMutatesThis() {
+    public SideEffectFlags setMutatesThis() {
       removeFlag(Node.FLAG_THIS_UNMODIFIED);
+      return this;
     }
 
-    public void setMutatesArguments() {
+    public SideEffectFlags setMutatesArguments() {
       removeFlag(Node.FLAG_ARGUMENTS_UNMODIFIED);
+      return this;
     }
 
-    public void setReturnsTainted() {
+    public SideEffectFlags setReturnsTainted() {
       removeFlag(Node.FLAG_LOCAL_RESULTS);
+      return this;
     }
 
     private void removeFlag(int flag) {
@@ -2088,6 +2128,17 @@ public class Node implements Cloneable, Serializable {
   }
 
   /**
+   * @return Whether the only side-effect is "modifies arguments"
+   */
+  public boolean isOnlyModifiesArgumentsCall() {
+    return areBitFlagsSet(
+        getSideEffectFlags() & Node.NO_SIDE_EFFECTS,
+        Node.FLAG_GLOBAL_STATE_UNMODIFIED
+            | Node.FLAG_THIS_UNMODIFIED
+            | Node.FLAG_NO_THROWS);
+  }
+
+  /**
    * Returns true if this node is a function or constructor call that
    * has no side effects.
    */
@@ -2102,6 +2153,17 @@ public class Node implements Cloneable, Serializable {
    */
   public boolean isLocalResultCall() {
     return areBitFlagsSet(getSideEffectFlags(), FLAG_LOCAL_RESULTS);
+  }
+
+  /** Returns true if this is a new/call that may mutate its arguments. */
+  public boolean mayMutateArguments() {
+    return !areBitFlagsSet(getSideEffectFlags(), FLAG_ARGUMENTS_UNMODIFIED);
+  }
+
+  /** Returns true if this is a new/call that may mutate global state or throw. */
+  public boolean mayMutateGlobalStateOrThrow() {
+    return !areBitFlagsSet(getSideEffectFlags(),
+        FLAG_GLOBAL_STATE_UNMODIFIED | FLAG_NO_THROWS);
   }
 
   /**

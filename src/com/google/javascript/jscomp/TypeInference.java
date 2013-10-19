@@ -26,10 +26,10 @@ import static com.google.javascript.rhino.jstype.JSTypeNative.NUMBER_VALUE_OR_OB
 import static com.google.javascript.rhino.jstype.JSTypeNative.STRING_TYPE;
 import static com.google.javascript.rhino.jstype.JSTypeNative.UNKNOWN_TYPE;
 import static com.google.javascript.rhino.jstype.JSTypeNative.VOID_TYPE;
-import static com.google.javascript.rhino.jstype.JSTypeRegistry.OBJECT_ELEMENT_TEMPLATE;
-import static com.google.javascript.rhino.jstype.JSTypeRegistry.OBJECT_INDEX_TEMPLATE;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.javascript.jscomp.CodingConvention.AssertionFunctionSpec;
@@ -48,9 +48,10 @@ import com.google.javascript.rhino.jstype.JSTypeNative;
 import com.google.javascript.rhino.jstype.JSTypeRegistry;
 import com.google.javascript.rhino.jstype.ModificationVisitor;
 import com.google.javascript.rhino.jstype.ObjectType;
-import com.google.javascript.rhino.jstype.TemplateTypeMap;
 import com.google.javascript.rhino.jstype.StaticSlot;
 import com.google.javascript.rhino.jstype.TemplateType;
+import com.google.javascript.rhino.jstype.TemplateTypeMap;
+import com.google.javascript.rhino.jstype.TemplateTypeMapReplacer;
 import com.google.javascript.rhino.jstype.UnionType;
 
 import java.util.Collections;
@@ -223,7 +224,8 @@ class TypeInference
               JSType iterKeyType = getNativeType(STRING_TYPE);
               ObjectType objType = getJSType(obj).dereference();
               JSType objIndexType = objType == null ?
-                  null : objType.getTemplateTypeMap().getTemplateType(OBJECT_INDEX_TEMPLATE);
+                  null : objType.getTemplateTypeMap().getTemplateType(
+                      registry.getObjectIndexKey());
               if (objIndexType != null && !objIndexType.isUnknownType()) {
                 JSType narrowedKeyType =
                     iterKeyType.getGreatestSubtype(objIndexType);
@@ -449,25 +451,11 @@ class TypeInference
 
       case Token.CAST:
         scope = traverseChildren(n, scope);
-        break;
-    }
-
-    // TODO(johnlenz): remove this after the CAST node change has shaken out.
-    if (!n.isFunction()) {
-      JSDocInfo info = n.getJSDocInfo();
-      if (info != null && info.hasType()) {
-        JSType castType = info.getType().evaluate(syntacticScope, registry);
-
-        // A stubbed type declaration on a qualified name should take
-        // effect for all subsequent accesses of that name,
-        // so treat it the same as an assign to that name.
-        if (n.isQualifiedName() &&
-            n.getParent().isExprResult()) {
-          updateScopeForTypeChange(scope, n, n.getJSType(), castType);
+        JSDocInfo info = n.getJSDocInfo();
+        if (info != null && info.hasType()) {
+          n.setJSType(info.getType().evaluate(syntacticScope, registry));
         }
-
-        n.setJSType(castType);
-      }
+        break;
     }
 
     return scope;
@@ -584,14 +572,35 @@ class TypeInference
     JSType nodeType = getJSType(obj);
     ObjectType objectType = ObjectType.cast(
         nodeType.restrictByNotNullOrUndefined());
+    boolean propCreationInConstructor = obj.isThis() &&
+        getJSType(syntacticScope.getRootNode()).isConstructor();
+
     if (objectType == null) {
       registry.registerPropertyOnType(propName, nodeType);
     } else {
-      // Don't add the property to @struct objects outside a constructor
       if (nodeType.isStruct() && !objectType.hasProperty(propName)) {
-        if (!(obj.isThis() &&
-              getJSType(syntacticScope.getRootNode()).isConstructor())) {
-          return;
+        // In general, we don't want to define a property on a struct object,
+        // b/c TypeCheck will later check for improper property creation on
+        // structs. There are two exceptions.
+        // 1) If it's a property created inside the constructor, on the newly
+        //    created instance, allow it.
+        // 2) If it's a prototype property, allow it. For example:
+        //    Foo.prototype.bar = baz;
+        //    where Foo.prototype is a struct and the assignment happens at the
+        //    top level and the constructor Foo is defined in the same file.
+        boolean staticPropCreation = false;
+        Node maybeAssignStm = getprop.getParent().getParent();
+        if (syntacticScope.isGlobal() &&
+            NodeUtil.isPrototypePropertyDeclaration(maybeAssignStm)) {
+          String propCreationFilename = maybeAssignStm.getSourceFileName();
+          Node ctor = objectType.getOwnerFunction().getSource();
+          if (ctor != null &&
+              ctor.getSourceFileName().equals(propCreationFilename)) {
+            staticPropCreation = true;
+          }
+        }
+        if (!propCreationInConstructor && !staticPropCreation) {
+          return; // Early return to avoid creating the property below.
         }
       }
 
@@ -618,8 +627,7 @@ class TypeInference
           } else {
             objectType.defineInferredProperty(propName, rightType, getprop);
           }
-        } else if (obj.isThis() &&
-                   getJSType(syntacticScope.getRootNode()).isConstructor()) {
+        } else if (propCreationInConstructor) {
           objectType.defineInferredProperty(propName, rightType, getprop);
         } else {
           registry.registerPropertyOnType(propName, objectType);
@@ -738,20 +746,13 @@ class TypeInference
       scope = traverse(name.getFirstChild(), scope);
     }
 
-    // Object literals can be reflected on other types, or changed with
-    // type casts.
-    // See CodingConvention#getObjectLiteralCase and goog.object.reflect.
+    // Object literals can be reflected on other types.
+    // See CodingConvention#getObjectLiteralCast and goog.reflect.object
     // Ignore these types of literals.
-    // TODO(nicksantos): There should be an "anonymous object" type that
-    // we can check for here.
     ObjectType objectType = ObjectType.cast(type);
-    if (objectType == null) {
-      return scope;
-    }
-
-    boolean hasLendsName = n.getJSDocInfo() != null &&
-        n.getJSDocInfo().getLendsName() != null;
-    if (objectType.hasReferenceName() && !hasLendsName) {
+    if (objectType == null
+        || n.getBooleanProp(Node.REFLECTED_OBJECT)
+        || objectType.isEnumType()) {
       return scope;
     }
 
@@ -1101,7 +1102,7 @@ class TypeInference
         // template types amongst their templatized types.
         TemplateTypeMap paramTypeMap = paramType.getTemplateTypeMap();
         TemplateTypeMap argTypeMap = argObjectType.getTemplateTypeMap();
-        for (String key : paramTypeMap.getTemplateKeys()) {
+        for (TemplateType key : paramTypeMap.getTemplateKeys()) {
           maybeResolveTemplatedType(
               paramTypeMap.getTemplateType(key),
               argTypeMap.getTemplateType(key),
@@ -1140,7 +1141,7 @@ class TypeInference
     }
   }
 
-  private void resolvedTemplateType(
+  private static void resolvedTemplateType(
       Map<TemplateType, JSType> map, TemplateType template, JSType resolved) {
     JSType previous = map.get(template);
     if (!resolved.isUnknownType()) {
@@ -1181,13 +1182,22 @@ class TypeInference
    */
   private boolean inferTemplatedTypesForCall(
       Node n, FunctionType fnType) {
-    if (fnType.getTemplateTypeMap().getTemplateKeys().isEmpty()) {
+    final ImmutableList<TemplateType> keys = fnType.getTemplateTypeMap()
+        .getTemplateKeys();
+    if (keys.isEmpty()) {
       return false;
     }
 
     // Try to infer the template types
-    Map<TemplateType, JSType> inferred = inferTemplateTypesFromParameters(
-        fnType, n);
+    Map<TemplateType, JSType> inferred = Maps.filterKeys(
+        inferTemplateTypesFromParameters(fnType, n),
+        new Predicate<TemplateType>() {
+
+          @Override
+          public boolean apply(TemplateType key) {
+            return keys.contains(key);
+          }}
+        );
 
     // Replace all template types. If we couldn't find a replacement, we
     // replace it with UNKNOWN.
@@ -1224,8 +1234,18 @@ class TypeInference
           ct = (FunctionType) constructorType;
         }
         if (ct != null && ct.isConstructor()) {
-          type = ct.getInstanceType();
           backwardsInferenceFromCallSite(n, ct);
+
+          // If necessary, create a TemplatizedType wrapper around the instance
+          // type, based on the types of the constructor parameters.
+          ObjectType instanceType = ct.getInstanceType();
+          Map<TemplateType, JSType> inferredTypes =
+              inferTemplateTypesFromParameters(ct, n);
+          if (inferredTypes.isEmpty()) {
+            type = instanceType;
+          } else {
+            type = registry.createTemplatizedType(instanceType, inferredTypes);
+          }
         }
       }
     }
@@ -1248,8 +1268,8 @@ class TypeInference
     scope = traverseChildren(n, scope);
     JSType type = getJSType(n.getFirstChild()).restrictByNotNullOrUndefined();
     TemplateTypeMap typeMap = type.getTemplateTypeMap();
-    if (typeMap.hasTemplateType(OBJECT_ELEMENT_TEMPLATE)) {
-      n.setJSType(typeMap.getTemplateType(OBJECT_ELEMENT_TEMPLATE));
+    if (typeMap.hasTemplateType(registry.getObjectElementKey())) {
+      n.setJSType(typeMap.getTemplateType(registry.getObjectElementKey()));
     }
     return dereferencePointer(n.getFirstChild(), scope);
   }
@@ -1279,7 +1299,7 @@ class TypeInference
    * If we give the anonymous object an inferred property of (number|undefined),
    * then this code will type-check appropriately.
    */
-  private void inferPropertyTypesToMatchConstraint(
+  private static void inferPropertyTypesToMatchConstraint(
       JSType type, JSType constraint) {
     if (type == null || constraint == null) {
       return;
@@ -1332,6 +1352,17 @@ class TypeInference
       JSType foundType = objType.findPropertyType(propName);
       if (foundType != null) {
         propertyType = foundType;
+      }
+    }
+
+    if (propertyType != null && objType != null) {
+      JSType restrictedObjType = objType.restrictByNotNullOrUndefined();
+      if (!restrictedObjType.getTemplateTypeMap().isEmpty()
+          && propertyType.hasAnyTemplateTypes()) {
+        TemplateTypeMap typeMap = restrictedObjType.getTemplateTypeMap();
+        TemplateTypeMapReplacer replacer = new TemplateTypeMapReplacer(
+            registry, typeMap);
+        propertyType = propertyType.visit(replacer);
       }
     }
 

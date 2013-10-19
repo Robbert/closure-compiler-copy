@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 The Closure Compiler Authors.
+ * Copyright 2013 The Closure Compiler Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,31 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.google.javascript.jscomp;
 
-import com.google.common.collect.Sets;
-
-import java.util.Set;
+import java.io.Serializable;
 
 /**
- * Generates new variables names that would not collide with existing names in
- * a scope.
- *
- *
+ * Interface used by to substitute names.
+ * @author johnlenz@google.com (John Lenz)
  */
-class VariableNameGenerator {
-  private final NameGenerator names;
-  private final Scope scope;
-  VariableNameGenerator(Scope scope) {
-    this.scope = scope;
-    Set<String> usedNames = Sets.newHashSet();
-    names = new NameGenerator(usedNames, "", null);
-  }
-
-  String getNextNewName() {
-    String name = null;
-    while (scope.isDeclared(name = names.generateNextName(), true)) {}
-    return name;
-  }
+public interface RenamingMap extends Serializable {
+  String get(String value);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Closure Compiler Authors
+ * Copyright 2008 The Closure Compiler Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -275,10 +275,10 @@ function ClipboardData() {}
 
 /**
  * @see http://msdn.microsoft.com/en-us/library/ms535220(VS.85).aspx
- * @param {string} type Type of clipboard data to clear. 'Text' or
+ * @param {string=} opt_type Type of clipboard data to clear. 'Text' or
  *     'URL' or 'File' or 'HTML' or 'Image'.
  */
-ClipboardData.prototype.clearData = function(type) {};
+ClipboardData.prototype.clearData = function(opt_type) {};
 
 /**
  * @see http://msdn.microsoft.com/en-us/library/ms535220(VS.85).aspx
@@ -298,6 +298,14 @@ ClipboardData.prototype.getData = function(type) { };
 
 /** @type {function(new:ActiveXObject, string, string=)} */
 Window.prototype.ActiveXObject;
+
+/**
+ * @param {number|undefined|null} immediateID
+ * @see https://developer.mozilla.org/en-US/docs/DOM/window.clearImmediate
+ * @see http://msdn.microsoft.com/en-us/library/ie/hh924825(v=vs.85).aspx
+ * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-clearImmediate
+ */
+Window.prototype.clearImmediate = function(immediateID) {};
 
 /**
  * @see http://msdn.microsoft.com/en-us/library/ms535220(VS.85).aspx
@@ -461,6 +469,15 @@ Window.prototype.resizeTo = function(width, height) {};
 Window.prototype.setActive;
 
 /**
+ * @param {function()} callback
+ * @return {number}
+ * @see https://developer.mozilla.org/en-US/docs/DOM/window.setImmediate
+ * @see http://msdn.microsoft.com/en-us/library/ie/hh773176(v=vs.85).aspx
+ * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-setImmediate
+ */
+Window.prototype.setImmediate = function(callback) {};
+
+/**
  * @see http://msdn.microsoft.com/en-us/library/ms536758(VS.85).aspx
  */
 Window.prototype.showHelp;
@@ -475,34 +492,6 @@ Window.prototype.showModelessDialog;
  * @const
  */
 Window.prototype.external;
-
-/**
- * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-setImmediate
- * @param {Function} fn
- * @param {...*} var_args
- * @return {number}
- */
-function setImmediate(fn, var_args) {};
-
-/**
- * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-setImmediate
- * @param {Function} fn
- * @param {...*} var_args
- * @return {number}
- */
-Window.prototype.setImmediate = function (fn, var_args) {};
-
-/**
- * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-clearImmediate
- * @param {number} id
- */
-function clearImmediate(id) {};
-
-/**
- * @see https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/setImmediate/Overview.html#si-clearImmediate
- * @param {number} id
- */
-Window.prototype.clearImmediate = function (id) {};
 
 /**
  * @constructor
@@ -542,6 +531,7 @@ History.prototype.forward = function() {};
 HTMLFrameElement.prototype.allowTransparency;
 
 /**
+ * @type {Window}
  * @see http://msdn.microsoft.com/en-us/library/ms533692(VS.85).aspx
  */
 HTMLFrameElement.prototype.contentWindow;
@@ -554,6 +544,7 @@ HTMLFrameElement.prototype.contentWindow;
 HTMLIFrameElement.prototype.allowTransparency;
 
 /**
+ * @type {Window}
  * @see http://msdn.microsoft.com/en-us/library/ms533692(VS.85).aspx
  */
 HTMLIFrameElement.prototype.contentWindow;
@@ -1005,6 +996,12 @@ Element.prototype.attachEvent;
 Element.prototype.canHaveChildren;
 
 /**
+ * @type {string}
+ * @see http://msdn.microsoft.com/en-us/library/ms533559(v=vs.85).aspx
+ */
+Element.prototype.classid;
+
+/**
  * @param {number} iCoordX Integer that specifies the client window coordinate
  *     of x.
  * @param {number} iCoordY Integer that specifies the client window coordinate
@@ -1116,6 +1113,7 @@ Element.prototype.onmouseleave;
 Element.prototype.onselectstart;
 
 /**
+ * @type {string}
  * @see http://msdn.microsoft.com/en-us/library/aa752326(VS.85).aspx
  */
 Element.prototype.outerHTML;

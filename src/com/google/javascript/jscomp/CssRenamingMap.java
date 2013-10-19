@@ -19,19 +19,23 @@ package com.google.javascript.jscomp;
 /**
  * Interface used by {@link ReplaceCssNames} to substitute CSS class names.
  */
-public interface CssRenamingMap {
+public interface CssRenamingMap extends RenamingMap {
+
+  /** Kind of renaming map */
   public static enum Style {
     BY_WHOLE,
     BY_PART,
   }
 
+  @Override
   String get(String value);
 
   Style getStyle();
 
-  public static abstract class ByPart implements CssRenamingMap {
+  /** ByPart renaming map */
+  public abstract static class ByPart implements CssRenamingMap {
     @Override
-    abstract public String get(String value);
+    public abstract String get(String value);
 
     @Override
     public Style getStyle() {
@@ -39,9 +43,10 @@ public interface CssRenamingMap {
     }
   }
 
-  public static abstract class ByWhole implements CssRenamingMap {
+  /** ByWhole renaming map */
+  public abstract static class ByWhole implements CssRenamingMap {
     @Override
-    abstract public String get(String value);
+    public abstract String get(String value);
 
     @Override
     public Style getStyle() {

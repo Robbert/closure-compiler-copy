@@ -47,6 +47,7 @@ public class PeepholeIntegrationTest extends CompilerTestCase {
   public CompilerPass getProcessor(final Compiler compiler) {
     PeepholeOptimizationsPass peepholePass =
       new PeepholeOptimizationsPass(compiler,
+        new PeepholeMinimizeConditions(late),
         new PeepholeSubstituteAlternateSyntax(late),
         new PeepholeRemoveDeadCode(),
         new PeepholeFoldConstants(late)
@@ -71,7 +72,7 @@ public class PeepholeIntegrationTest extends CompilerTestCase {
 
   // TODO(user): This is same as fold() except it uses string comparison. Any
   // test that needs tell us where a folding is constructing an invalid AST.
-  private void assertResultString(String js, String expected) {
+  private static void assertResultString(String js, String expected) {
     PeepholeIntegrationTest scTest = new PeepholeIntegrationTest(false);
 
     scTest.disableNormalize();
@@ -172,7 +173,7 @@ public class PeepholeIntegrationTest extends CompilerTestCase {
          "x=cond?2:3");
 
     fold("x?void 0:y()", "x||y()");
-    fold("!x?void 0:y()", "(!x)||y()");
+    fold("!x?void 0:y()", "x&&y()");
     fold("x?y():void 0", "x&&y()");
   }
 

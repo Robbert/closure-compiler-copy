@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Closure Compiler Authors
+ * Copyright 2008 The Closure Compiler Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -134,6 +134,13 @@ var sun;
 function alert(x) {}
 
 /**
+ * @param {number|undefined|null} immediateID
+ * @see https://developer.mozilla.org/en-US/docs/DOM/window.clearImmediate
+ * @see http://msdn.microsoft.com/en-us/library/ie/hh924825(v=vs.85).aspx
+ */
+function clearImmediate(immediateID) {}
+
+/**
  * @param {number|undefined?} intervalID
  * @see https://developer.mozilla.org/en/DOM/window.clearInterval
  */
@@ -162,6 +169,14 @@ function dump(x) {}
  * @see https://developer.mozilla.org/en/DOM/window.prompt
  */
 function prompt(message, opt_value) {}
+
+/**
+ * @param {function()} callback
+ * @return {number}
+ * @see https://developer.mozilla.org/en-US/docs/DOM/window.setImmediate
+ * @see http://msdn.microsoft.com/en-us/library/ie/hh773176(v=vs.85).aspx
+ */
+function setImmediate(callback) {}
 
 /**
  * @param {Function|string} callback

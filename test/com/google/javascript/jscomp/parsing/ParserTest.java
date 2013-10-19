@@ -43,7 +43,7 @@ public class ParserTest extends BaseJSTypeTestCase {
 
   private static final String MISSING_GT_MESSAGE =
       "Bad type annotation. " +
-      com.google.javascript.rhino.ScriptRuntime.getMessage0(
+      com.google.javascript.rhino.SimpleErrorReporter.getMessage0(
           "msg.jsdoc.missing.gt");
 
   private static final String MISPLACED_TYPE_ANNOTATION =
@@ -130,7 +130,7 @@ public class ParserTest extends BaseJSTypeTestCase {
 
     assertEquals(Token.GETELEM, call.getType());
     assertEquals(3, call.getLineno());
-    assertEquals(2, call.getCharno());
+    assertEquals(1, call.getCharno());
   }
 
   public void testLinenoCharnoForComparison() throws Exception {
@@ -305,8 +305,6 @@ public class ParserTest extends BaseJSTypeTestCase {
   public void testJSDocAttachment3() {
     Node assignNode = parse(
         "/** @type number */goog.FOO = 5;").getFirstChild().getFirstChild();
-
-    // ASSIGN
     assertEquals(Token.ASSIGN, assignNode.getType());
     JSDocInfo info = assignNode.getJSDocInfo();
     assertNotNull(info);
@@ -315,7 +313,7 @@ public class ParserTest extends BaseJSTypeTestCase {
 
   public void testJSDocAttachment4() {
     Node varNode = parse(
-        "var a, /** @define {number} */b = 5;").getFirstChild();
+        "var a, /** @define {number} */ b = 5;").getFirstChild();
 
     // ASSIGN
     assertEquals(Token.VAR, varNode.getType());
@@ -480,6 +478,57 @@ public class ParserTest extends BaseJSTypeTestCase {
   }
 
   public void testJSDocAttachment17() {
+    Node fn =
+        parse(
+            "function f() { " +
+            "  return /** @type {string} */ (g(1 /** @desc x */));" +
+            "};").getFirstChild();
+    assertEquals(Token.FUNCTION, fn.getType());
+    Node cast = fn.getLastChild().getFirstChild().getFirstChild();
+    assertEquals(Token.CAST, cast.getType());
+  }
+
+  public void testJSDocAttachment18() {
+    Node fn =
+        parse(
+            "function f() { " +
+            "  var x = /** @type {string} */ (y);" +
+            "};").getFirstChild();
+    assertEquals(Token.FUNCTION, fn.getType());
+    Node cast =
+        fn.getLastChild().getFirstChild().getFirstChild().getFirstChild();
+    assertEquals(Token.CAST, cast.getType());
+  }
+
+  public void testJSDocAttachment19() {
+    Node fn =
+        parse(
+            "function f() { " +
+            "  /** @type {string} */" +
+            "  return;" +
+            "};").getFirstChild();
+    assertEquals(Token.FUNCTION, fn.getType());
+
+    Node ret = fn.getLastChild().getFirstChild();
+    assertEquals(Token.RETURN, ret.getType());
+    assertNull(ret.getJSDocInfo());
+  }
+
+  public void testJSDocAttachment20() {
+    Node fn =
+        parse(
+            "function f() { " +
+            "  /** @type {string} */" +
+            "  if (true) return;" +
+            "};").getFirstChild();
+    assertEquals(Token.FUNCTION, fn.getType());
+
+    Node ret = fn.getLastChild().getFirstChild();
+    assertEquals(Token.IF, ret.getType());
+    assertNull(ret.getJSDocInfo());
+  }
+
+  public void testInlineJSDocAttachment1() {
     Node fn = parse("function f(/** string */ x) {}").getFirstChild();
     assertTrue(fn.isFunction());
 
@@ -489,14 +538,49 @@ public class ParserTest extends BaseJSTypeTestCase {
     assertTypeEquals(STRING_TYPE, info.getType());
   }
 
-  public void testJSDocAttachment18() {
-    Node fn = parse("function f(/** {string} */ x) {}").getFirstChild();
+  public void testInlineJSDocAttachment2() {
+    Node fn = parse(
+        "function f(/** ? */ x) {}").getFirstChild();
     assertTrue(fn.isFunction());
 
     JSDocInfo info =
         fn.getFirstChild().getNext().getFirstChild().getJSDocInfo();
     assertNotNull(info);
+    assertTypeEquals(UNKNOWN_TYPE, info.getType());
+  }
+
+  public void testInlineJSDocAttachment3() {
+    parse(
+        "function f(/** @type {string} */ x) {}",
+        "Bad type annotation. type not recognized due to syntax error");
+  }
+
+  public void testInlineJSDocAttachment4() {
+    parse(
+        "function f(/**\n" +
+        " * @type {string}\n" +
+        " */ x) {}",
+        "Bad type annotation. type not recognized due to syntax error");
+  }
+
+  public void testInlineJSDocAttachment5() {
+    Node vardecl = parse("var /** string */ x = 'asdf';").getFirstChild();
+    JSDocInfo info = vardecl.getFirstChild().getJSDocInfo();
+    assertNotNull(info);
     assertTypeEquals(STRING_TYPE, info.getType());
+  }
+
+  public void testInlineJSDocAttachment6() {
+    Node fn = parse("function f(/** {attr: number} */ x) {}").getFirstChild();
+    assertTrue(fn.isFunction());
+
+    JSDocInfo info =
+        fn.getFirstChild().getNext().getFirstChild().getJSDocInfo();
+    assertNotNull(info);
+    assertTypeEquals(createRecordTypeBuilder().
+        addProperty("attr", NUMBER_TYPE, null).
+        build(),
+        info.getType());
   }
 
   public void testIncorrectJSDocDoesNotAlterJSParsing1() throws Exception {
@@ -651,6 +735,43 @@ public class ParserTest extends BaseJSTypeTestCase {
 
   public void testSuspiciousBlockCommentWarning2() {
     parse("/* \n * @type {number} */ var x = 3;", SUSPICIOUS_COMMENT_WARNING);
+  }
+
+  public void testSuspiciousBlockCommentWarning3() {
+    parse("/* \n *@type {number} */ var x = 3;", SUSPICIOUS_COMMENT_WARNING);
+  }
+
+  public void testSuspiciousBlockCommentWarning4() {
+    parse(
+        "  /*\n" +
+        "   * @type {number}\n" +
+        "   */\n" +
+        "  var x = 3;",
+        SUSPICIOUS_COMMENT_WARNING);
+  }
+
+  public void testSuspiciousBlockCommentWarning5() {
+    parse(
+        "  /*\n" +
+        "   * some random text here\n" +
+        "   * @type {number}\n" +
+        "   */\n" +
+        "  var x = 3;",
+        SUSPICIOUS_COMMENT_WARNING);
+  }
+
+  public void testSuspiciousBlockCommentWarning6() {
+    parse("/* @type{number} */ var x = 3;", SUSPICIOUS_COMMENT_WARNING);
+  }
+
+  public void testSuspiciousBlockCommentWarning7() {
+    // jsdoc tags contain letters only, no underscores etc.
+    parse("/* @cc_on */ var x = 3;");
+  }
+
+  public void testSuspiciousBlockCommentWarning8() {
+    // a jsdoc tag can't be immediately followed by a paren
+    parse("/* @TODO(username) */ var x = 3;");
   }
 
   public void testCatchClauseForbidden() {
@@ -850,9 +971,9 @@ public class ParserTest extends BaseJSTypeTestCase {
   public void testReservedKeywords() {
     mode = LanguageMode.ECMASCRIPT3;
 
-    parseError("var boolean;", "missing variable name");
+    parseError("var boolean;", "identifier is a reserved word");
     parseError("function boolean() {};",
-        "missing ( before function parameters.");
+        "identifier is a reserved word");
     parseError("boolean = 1;", "identifier is a reserved word");
     parseError("class = 1;", "identifier is a reserved word");
     parseError("public = 2;", "identifier is a reserved word");
@@ -877,25 +998,27 @@ public class ParserTest extends BaseJSTypeTestCase {
   public void testKeywordsAsProperties() {
     mode = LanguageMode.ECMASCRIPT3;
 
-    parseError("var x = {function: 1};", "invalid property id");
-    parseError("x.function;", "missing name after . operator");
+    parse("var x = {function: 1};", IRFactory.INVALID_ES3_PROP_NAME);
+    parse("x.function;", IRFactory.INVALID_ES3_PROP_NAME);
     parseError("var x = {get x(){} };",
         IRFactory.GETTER_ERROR_MESSAGE);
-    parseError("var x = {get function(){} };", "invalid property id");
+    parseError("var x = {get function(){} };", IRFactory.GETTER_ERROR_MESSAGE);
     parseError("var x = {get 'function'(){} };",
         IRFactory.GETTER_ERROR_MESSAGE);
     parseError("var x = {get 1(){} };",
         IRFactory.GETTER_ERROR_MESSAGE);
-    parseError("var x = {set function(a){} };", "invalid property id");
+    parseError("var x = {set function(a){} };", IRFactory.SETTER_ERROR_MESSAGE);
     parseError("var x = {set 'function'(a){} };",
         IRFactory.SETTER_ERROR_MESSAGE);
     parseError("var x = {set 1(a){} };",
         IRFactory.SETTER_ERROR_MESSAGE);
-    parseError("var x = {class: 1};", "invalid property id");
-    parseError("x.class;", "missing name after . operator");
-    parse("var x = {let: 1};");
+    parse("var x = {class: 1};", IRFactory.INVALID_ES3_PROP_NAME);
+    parse("var x = {'class': 1};");
+    parse("x.class;", IRFactory.INVALID_ES3_PROP_NAME);
+    parse("x['class'];");
+    parse("var x = {let: 1};");  // 'let' is not reserved in ES3
     parse("x.let;");
-    parse("var x = {yield: 1};");
+    parse("var x = {yield: 1};"); // 'yield' is not reserved in ES3
     parse("x.yield;");
 
     mode = LanguageMode.ECMASCRIPT5;
@@ -1001,28 +1124,28 @@ public class ParserTest extends BaseJSTypeTestCase {
   }
 
   public void testMisplacedTypeAnnotation2() {
-    // missing parenthese for the cast.
+    // missing parentheses for the cast.
     parse(
         "var o = /** @type {string} */ getValue();",
         MISPLACED_TYPE_ANNOTATION);
   }
 
   public void testMisplacedTypeAnnotation3() {
-    // missing parenthese for the cast.
+    // missing parentheses for the cast.
     parse(
         "var o = 1 + /** @type {string} */ value;",
         MISPLACED_TYPE_ANNOTATION);
   }
 
   public void testMisplacedTypeAnnotation4() {
-    // missing parenthese for the cast.
+    // missing parentheses for the cast.
     parse(
         "var o = /** @type {!Array.<string>} */ ['hello', 'you'];",
         MISPLACED_TYPE_ANNOTATION);
   }
 
   public void testMisplacedTypeAnnotation5() {
-    // missing parenthese for the cast.
+    // missing parentheses for the cast.
     parse(
         "var o = (/** @type {!Foo} */ {});",
         MISPLACED_TYPE_ANNOTATION);
@@ -1054,6 +1177,17 @@ public class ParserTest extends BaseJSTypeTestCase {
     // This one we don't currently support in the type checker but
     // we would like to.
     parse("try {} catch (/** @type {Error} */ e) {}");
+  }
+
+  public void testParsingAssociativity() {
+    assertNodeEquality(parse("x * y * z"), parse("(x * y) * z"));
+    assertNodeEquality(parse("x + y + z"), parse("(x + y) + z"));
+    assertNodeEquality(parse("x | y | z"), parse("(x | y) | z"));
+    assertNodeEquality(parse("x & y & z"), parse("(x & y) & z"));
+    assertNodeEquality(parse("x ^ y ^ z"), parse("(x ^ y) ^ z"));
+    // TODO(blickly): Fix rhino to parse || and && left-associatively.
+    assertNodeEquality(parse("x || y || z"), parse("x || (y || z)"));
+    assertNodeEquality(parse("x && y && z"), parse("x && (y && z)"));
   }
 
   /**

@@ -84,7 +84,15 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
 
   static final DiagnosticType INVALID_PROVIDE_ERROR = DiagnosticType.error(
       "JSC_INVALID_PROVIDE_ERROR",
-      "\"{0}\" is not a valid JS property name");
+      "\"{0}\" is not a valid JS identifier name");
+
+  static final DiagnosticType INVALID_DEFINE_NAME_ERROR = DiagnosticType.error(
+      "JSC_INVALID_DEFINE_NAME_ERROR",
+      "\"{0}\" is not a valid JS identifier name");
+
+  static final DiagnosticType MISSING_DEFINE_ANNOTATION = DiagnosticType.error(
+      "JSC_INVALID_MISSING_DEFINE_ANNOTATION",
+      "Missing @define annotation");
 
   static final DiagnosticType XMODULE_REQUIRE_ERROR = DiagnosticType.warning(
       "JSC_XMODULE_REQUIRE_ERROR",
@@ -119,6 +127,7 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
   private final Set<String> exportedVariables = Sets.newHashSet();
   private final CheckLevel requiresLevel;
   private final PreprocessorSymbolTable preprocessorSymbolTable;
+  private final List<Node> defineCalls = Lists.newArrayList();
 
   ProcessClosurePrimitives(AbstractCompiler compiler,
       @Nullable PreprocessorSymbolTable preprocessorSymbolTable,
@@ -141,6 +150,10 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
   public void process(Node externs, Node root) {
     new NodeTraversal(compiler, this).traverse(root);
 
+    for (Node n : defineCalls) {
+      replaceGoogDefines(n);
+    }
+
     for (ProvidedName pn : providedNames.values()) {
       pn.replace();
     }
@@ -160,6 +173,22 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
             r.inputName, r.requireNode, requiresLevel, error, r.namespace));
       }
     }
+  }
+
+  /**
+   * @param n
+   */
+  private void replaceGoogDefines(Node n) {
+    Node parent = n.getParent();
+    Preconditions.checkState(parent.isExprResult());
+    String name = n.getChildAtIndex(1).getString();
+    Node value = n.getChildAtIndex(2).detachFromParent();
+
+    Node replacement = NodeUtil.newQualifiedNameNodeDeclaration(
+        compiler.getCodingConvention(), name, value, n.getJSDocInfo());
+    replacement.useSourceInfoIfMissingFromForTree(n);
+    parent.getParent().replaceChild(parent, replacement);
+    compiler.reportCodeChange();
   }
 
   @Override
@@ -188,6 +217,8 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
             } else if (!isExpr) {
               // All other methods must be called in an EXPR.
               break;
+            } else if ("define".equals(methodName)) {
+              processDefineCall(t, n, parent);
             } else if ("require".equals(methodName)) {
               processRequireCall(t, n, parent);
             } else if ("provide".equals(methodName)) {
@@ -264,7 +295,7 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
   private void processRequireCall(NodeTraversal t, Node n, Node parent) {
     Node left = n.getFirstChild();
     Node arg = left.getNext();
-    if (verifyArgument(t, left, arg)) {
+    if (verifyLastArgumentIsString(t, left, arg)) {
       String ns = arg.getString();
       ProvidedName provided = providedNames.get(ns);
       if (provided == null || !provided.isExplicitlyProvided()) {
@@ -290,12 +321,11 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
       maybeAddToSymbolTable(left);
       maybeAddStringNodeToSymbolTable(arg);
 
-      // Requires should be removed before runtime.  The one
-      // exception is if the type has not been provided yet and
-      // errors for broken requires are turned off, in which case,
-      // we will be doing a later pass that may error, so we can
-      // leave this here this time and let it error next time if it
-      // is still not provided.
+      // Requires should be removed before further processing.
+      // Some clients run closure pass multiple times, first with
+      // the checks for broken requires turned off. In these cases, we
+      // allow broken requires to be preserved by the first run to
+      // let them be caught in the subsequent run.
       if (provided != null || requiresLevel.isOn()) {
         parent.detachFromParent();
         compiler.reportCodeChange();
@@ -328,6 +358,24 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
         providedNames.put(
             ns, new ProvidedName(ns, parent, t.getModule(), true));
       }
+    }
+  }
+
+    /**
+   * Handles a goog.define call.
+   */
+  private void processDefineCall(NodeTraversal t, Node n, Node parent) {
+    Node left = n.getFirstChild();
+    Node args = left.getNext();
+    if (verifyDefine(t, parent, left, args)) {
+      Node nameNode = args;
+      String name = args.getString();
+      Node value = args.getNext();
+
+      maybeAddToSymbolTable(left);
+      maybeAddStringNodeToSymbolTable(nameNode);
+
+      this.defineCalls.add(n);
     }
   }
 
@@ -610,13 +658,15 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
         // To speed things up, only consider cases where len(b) <= 10
         List<String> errors = Lists.newArrayList();
         for (Map.Entry<String, String> b : cssNames.entrySet()) {
-          if (b.getKey().length() > 10) continue;
+          if (b.getKey().length() > 10) {
+            continue;
+          }
           for (Map.Entry<String, String> a : cssNames.entrySet()) {
             String combined = cssNames.get(a.getKey() + "-" + b.getKey());
             if (combined != null &&
                 !combined.equals(a.getValue() + "-" + b.getValue())) {
-              errors.add("map(" + a.getKey() + "-" + b.getKey() +") != map(" +
-                         a.getKey() + ")-map(" + b.getKey() +")");
+              errors.add("map(" + a.getKey() + "-" + b.getKey() + ") != map(" +
+                         a.getKey() + ")-map(" + b.getKey() + ")");
             }
           }
         }
@@ -655,7 +705,7 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
    * @return Whether the argument checked out okay
    */
   private boolean verifyProvide(NodeTraversal t, Node methodName, Node arg) {
-    if (!verifyArgument(t, methodName, arg)) {
+    if (!verifyLastArgumentIsString(t, methodName, arg)) {
       return false;
     }
 
@@ -669,35 +719,94 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
   }
 
   /**
+   * Verifies that a provide method call has exactly one argument,
+   * and that it's a string literal and that the contents of the string are
+   * valid JS tokens. Reports a compile error if it doesn't.
+   *
+   * @return Whether the argument checked out okay
+   */
+  private boolean verifyDefine(NodeTraversal t,
+      Node expr,
+      Node methodName, Node args) {
+
+    // Verify first arg
+    Node arg = args;
+    if (!verifyNotNull(t, methodName, arg) ||
+        !verifyOfType(t, methodName, arg, Token.STRING)) {
+      return false;
+    }
+
+    // Verify second arg
+    arg = arg.getNext();
+    if (!verifyNotNull(t, methodName, arg) ||
+        !verifyIsLast(t, methodName, arg)) {
+      return false;
+    }
+
+    String name = args.getString();
+    for (String part : name.split("\\.")) {
+      if (!NodeUtil.isValidQualifiedName(part)) {
+        compiler.report(t.makeError(args, INVALID_DEFINE_NAME_ERROR, name));
+        return false;
+      }
+    }
+
+    JSDocInfo info = expr.getFirstChild().getJSDocInfo();
+    if (info == null || !info.isDefine()) {
+      compiler.report(t.makeError(expr, MISSING_DEFINE_ANNOTATION));
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Verifies that a method call has exactly one argument, and that it's a
    * string literal. Reports a compile error if it doesn't.
    *
    * @return Whether the argument checked out okay
    */
-  private boolean verifyArgument(NodeTraversal t, Node methodName, Node arg) {
-    return verifyArgument(t, methodName, arg, Token.STRING);
+  private boolean verifyLastArgumentIsString(
+      NodeTraversal t, Node methodName, Node arg) {
+    return verifyNotNull(t, methodName, arg) &&
+        verifyOfType(t, methodName, arg, Token.STRING) &&
+        verifyIsLast(t, methodName, arg);
   }
 
   /**
-   * Verifies that a method call has exactly one argument, and that it is of the
-   * desired type. Reports a compile error if it doesn't.
-   *
    * @return Whether the argument checked out okay
    */
-  private boolean verifyArgument(NodeTraversal t, Node methodName, Node arg,
-      int desiredType) {
-    DiagnosticType diagnostic = null;
+  private boolean verifyNotNull(NodeTraversal t, Node methodName, Node arg) {
     if (arg == null) {
-      diagnostic = NULL_ARGUMENT_ERROR;
-    } else if (arg.getType() != desiredType) {
-      diagnostic = INVALID_ARGUMENT_ERROR;
-    } else if (arg.getNext() != null) {
-      diagnostic = TOO_MANY_ARGUMENTS_ERROR;
-    }
-    if (diagnostic != null) {
       compiler.report(
           t.makeError(methodName,
-              diagnostic, methodName.getQualifiedName()));
+              NULL_ARGUMENT_ERROR, methodName.getQualifiedName()));
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * @return Whether the argument checked out okay
+   */
+  private boolean verifyOfType(NodeTraversal t, Node methodName,
+      Node arg, int desiredType) {
+    if (arg.getType() != desiredType) {
+      compiler.report(
+          t.makeError(methodName,
+              INVALID_ARGUMENT_ERROR, methodName.getQualifiedName()));
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * @return Whether the argument checked out okay
+   */
+  private boolean verifyIsLast(NodeTraversal t, Node methodName, Node arg) {
+    if (arg.getNext() != null) {
+      compiler.report(
+          t.makeError(methodName,
+              TOO_MANY_ARGUMENTS_ERROR, methodName.getQualifiedName()));
       return false;
     }
     return true;
@@ -1071,8 +1180,8 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
         name);
 
     // Offsets to add to source. Named for documentation purposes.
-    final int FOR_QUOTE = 1;
-    final int FOR_DOT = 1;
+    final int forQuote = 1;
+    final int forDot = 1;
 
     Node current = null;
     for (current = syntheticRef;
@@ -1081,16 +1190,16 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
       int fullLen = current.getQualifiedName().length();
       int namespaceLen = current.getFirstChild().getQualifiedName().length();
 
-      current.setSourceEncodedPosition(n.getSourcePosition() + FOR_QUOTE);
+      current.setSourceEncodedPosition(n.getSourcePosition() + forQuote);
       current.setLength(fullLen);
 
       current.getLastChild().setSourceEncodedPosition(
-          n.getSourcePosition() + namespaceLen + FOR_QUOTE + FOR_DOT);
+          n.getSourcePosition() + namespaceLen + forQuote + forDot);
       current.getLastChild().setLength(
           current.getLastChild().getString().length());
     }
 
-    current.setSourceEncodedPosition(n.getSourcePosition() + FOR_QUOTE);
+    current.setSourceEncodedPosition(n.getSourcePosition() + forQuote);
     current.setLength(current.getString().length());
 
     maybeAddToSymbolTable(syntheticRef);

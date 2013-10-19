@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Closure Compiler Authors
+ * Copyright 2009 The Closure Compiler Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,14 @@
 /**
  * @fileoverview Definitions for the Chromium extensions API.
  *
+ * This is the externs file for the Chrome Extensions API.
+ * See https://developer.chrome.com/extensions/
+ *
  * There are several problematic issues regarding Chrome extension APIs and
  * this externs files, including:
  * A. When to add packages to this file
  * B. Optional parameters
- * C. Pseduo-types
+ * C. Pseudo-types
  * D. Events
  * E. Nullability
  *
@@ -58,21 +61,22 @@
  * C. Pseudo-types
  * The Chrome APIs define many types are that actually pseudo-types, that
  * is, they can't be instantiated by name, such as Port defined at
- * http://developer.chrome.com/extensions/extension.html#type-Port.
+ * http://developer.chrome.com/extensions/runtime.html#type-Port.
  *
  * There are two fundamentally different kinds of pseudo-types: those
  * instantiated in extension code and those instantiated in extension
  * library functions. The latter are returned by library functions or passed
- * to callbacks. Currently, there are no instances of the former in Chrome
- * Extension APIs, however, the app APIs include CreateWindowOptions, defined at
- * http://developer.chrome.com/apps/app.window.html#type-CreateWindowOptions.
+ * to callbacks. The Chrome Extension APIs include one instance of the former
+ * in Permissions, defined at
+ * http://developer.chrome.com/extensions/permissions.html#type-Permissions
  *
  * Those types instantiated in extension code should be declared as typedefs
  * so that object literals and objects created via goog.object are acceptable,
- * for example, a subset of CreateWindowOptions would be:
+ * for example, Permissions would be:
  *
- *   * at-typedef {{id: (string|undefined), singleton: (boolean|undefined)}}
- *   chrome.app.window.CreateWindowOptions;
+ *   * at-typedef {{permissions: (Array.<string>|undefined),
+ *                  origins: (Array.<string>|undefined)}}
+ *   chrome.permissions.Permissions;
  *
  * Those types instantiated in library code should be declared as classes.
  * Always qualify the type name to reduce top-level pollution in this file:
@@ -91,7 +95,7 @@
  * is the appropriate type when an event's listeners do not take any
  * parameters, however, many events take parameters specific to that event:
  *
- * 1. Create a pseduo-type for the event, for example,
+ * 1. Create a pseudo-type for the event, for example,
  *    chrome.runtime.PortEvent and define the four methods on it.
  * 2. Fully describe the listener/callback's signature, for example,
  *
@@ -123,10 +127,316 @@
 
 
 /**
- * namespace
+ * TODO(tbreisacher): Move all chrome.app.* externs into their own file.
  * @const
  */
-var chrome = {};
+chrome.app = {};
+
+
+/**
+ * @const
+ * @see http://developer.chrome.com/apps/app.runtime.html
+ */
+chrome.app.runtime = {};
+
+
+/**
+ * @typedef {{id: (string|undefined), items: (!Array.<!Object>|undefined)}}
+ */
+chrome.app.runtime.LaunchData;
+
+
+
+/**
+ * The type of chrome.app.runtime.onLaunched.
+ * @constructor
+ */
+chrome.app.runtime.LaunchEvent = function() {};
+
+
+/**
+ * @param {function(!chrome.app.runtime.LaunchData)} callback
+ * @see http://developer.chrome.com/apps/app.runtime.html#event-onLaunched
+ */
+chrome.app.runtime.LaunchEvent.prototype.addListener = function(callback) {};
+
+
+/**
+ * @param {function(!chrome.app.runtime.LaunchData)} callback
+ */
+chrome.app.runtime.LaunchEvent.prototype.removeListener = function(callback) {};
+
+
+/**
+ * @param {function(!chrome.app.runtime.LaunchData)} callback
+ * @return {boolean}
+ */
+chrome.app.runtime.LaunchEvent.prototype.hasListener = function(callback) {};
+
+
+/**
+ * @return {boolean}
+ */
+chrome.app.runtime.LaunchEvent.prototype.hasListeners = function() {};
+
+
+/** @type {!chrome.app.runtime.LaunchEvent} */
+chrome.app.runtime.onLaunched;
+
+
+/**
+ * @type {!ChromeEvent}
+ * @see http://developer.chrome.com/apps/app.runtime.html#event-onRestarted
+ */
+chrome.app.runtime.onRestarted;
+
+
+/**
+ * @const
+ * @see http://developer.chrome.com/apps/app.window.html
+ */
+chrome.app.window = {};
+
+
+
+/**
+ * @constructor
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow = function() {};
+
+
+/**
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.focus = function() {};
+
+
+/**
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.fullscreen = function() {};
+
+
+/**
+ * @return {boolean}
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.isFullscreen = function() {};
+
+
+/**
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.minimize = function() {};
+
+
+/**
+ * @return {boolean}
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.isMinimized = function() {};
+
+
+/**
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.maximize = function() {};
+
+
+/**
+ * @return {boolean}
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.isMaximized = function() {};
+
+
+/**
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.restore = function() {};
+
+
+/**
+ * @param {number} left The new left position, in pixels.
+ * @param {number} top The new top position, in pixels.
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.moveTo = function(left, top) {};
+
+
+/**
+ * @param {number} width The new width, in pixels.
+ * @param {number} height The new height, in pixels.
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.resizeTo = function(width, height) {};
+
+
+/**
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.drawAttention = function() {};
+
+
+/**
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.clearAttention = function() {};
+
+
+/**
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.close = function() {};
+
+
+/**
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.show = function() {};
+
+
+/**
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.hide = function() {};
+
+
+/**
+ * @return {!chrome.app.window.Bounds} The current window bounds.
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.getBounds = function() {};
+
+
+/**
+ * @param {!chrome.app.window.Bounds} bounds The new window bounds.
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.setBounds = function(bounds) {};
+
+
+/** @type {ChromeEvent} */
+chrome.app.window.AppWindow.prototype.onBoundsChanged;
+
+
+/** @type {ChromeEvent} */
+chrome.app.window.AppWindow.prototype.onClosed;
+
+
+/** @type {ChromeEvent} */
+chrome.app.window.AppWindow.prototype.onFullscreened;
+
+
+/** @type {ChromeEvent} */
+chrome.app.window.AppWindow.prototype.onMinimized;
+
+
+/** @type {ChromeEvent} */
+chrome.app.window.AppWindow.prototype.onMaximized;
+
+
+/** @type {ChromeEvent} */
+chrome.app.window.AppWindow.prototype.onRestored;
+
+
+/** @type {!Window} */
+chrome.app.window.AppWindow.prototype.contentWindow;
+
+
+/**
+ * @typedef {{
+ *   left: (number|undefined),
+ *   top: (number|undefined),
+ *   width: (number|undefined),
+ *   height: (number|undefined)
+ * }}
+ * @see http://developer.chrome.com/apps/app.window.html#type-Bounds
+ */
+chrome.app.window.Bounds;
+
+
+/**
+ * @typedef {{
+ *   id: (string|undefined),
+ *   minWidth: (number|undefined),
+ *   minHeight: (number|undefined),
+ *   maxWidth: (number|undefined),
+ *   maxHeight: (number|undefined),
+ *   frame: (string|undefined),
+ *   bounds: (!chrome.app.window.Bounds|undefined),
+ *   transparentBackground: (boolean|undefined),
+ *   hidden: (boolean|undefined),
+ *   resizable: (boolean|undefined),
+ *   singleton: (boolean|undefined)
+ * }}
+ * @see http://developer.chrome.com/apps/app.window.html#method-create
+ */
+chrome.app.window.CreateWindowOptions;
+
+
+/**
+ * @param {string} url URL to create.
+ * @param {!chrome.app.window.CreateWindowOptions=} opt_options The options for
+ *     the new window.
+ * @param {function(!chrome.app.window.AppWindow)=} opt_createWindowCallback
+ *     Callback to be run.
+ * @see http://developer.chrome.com/apps/app.window.html#method-create
+ */
+chrome.app.window.create = function(
+    url, opt_options, opt_createWindowCallback) {};
+
+
+/**
+ * Returns an AppWindow object for the current script context (ie JavaScript
+ * 'window' object).
+ * @return {!chrome.app.window.AppWindow}
+ * @see http://developer.chrome.com/apps/app.window.html#method-current
+ */
+chrome.app.window.current = function() {};
+
+
+/**
+ * @type {!ChromeEvent}
+ * @see http://developer.chrome.com/apps/app.window.html#event-onBoundsChanged
+ */
+chrome.app.window.onBoundsChanged;
+
+
+/**
+ * @type {!ChromeEvent}
+ * @see http://developer.chrome.com/apps/app.window.html#event-onClosed
+ */
+chrome.app.window.onClosed;
+
+
+/**
+ * @type {!ChromeEvent}
+ * @see http://developer.chrome.com/apps/app.window.html#event-onFullscreened
+ */
+chrome.app.window.onFullscreened;
+
+
+/**
+ * @type {!ChromeEvent}
+ * @see http://developer.chrome.com/apps/app.window.html#event-onMaximized
+ */
+chrome.app.window.onMaximized;
+
+
+/**
+ * @type {!ChromeEvent}
+ * @see http://developer.chrome.com/apps/app.window.html#event-onMinimized
+ */
+chrome.app.window.onMinimized;
+
+
+/**
+ * @type {!ChromeEvent}
+ * @see http://developer.chrome.com/apps/app.window.html#event-onRestored
+ */
+chrome.app.window.onRestored;
 
 
 /**
@@ -261,8 +571,54 @@ chrome.runtime.id;
 chrome.runtime.getBackgroundPage = function(callback) {};
 
 
+
 /**
- * @return {!Object} The full manifest file of the app or extension.
+ * Manifest information returned from chrome.runtime.getManifest. See
+ * http://developer.chrome.com/extensions/manifest.html. Note that there are
+ * several other fields not included here. They should be added to these externs
+ * as needed.
+ * @constructor
+ */
+chrome.runtime.Manifest = function() {};
+
+
+/** @type {string} */
+chrome.runtime.Manifest.prototype.name;
+
+
+/** @type {string} */
+chrome.runtime.Manifest.prototype.version;
+
+
+/** @type {number|undefined} */
+chrome.runtime.Manifest.prototype.manifest_version;
+
+
+/** @type {string|undefined} */
+chrome.runtime.Manifest.prototype.description;
+
+
+/** @type {!chrome.runtime.Manifest.Oauth2|undefined} */
+chrome.runtime.Manifest.prototype.oauth2;
+
+
+
+/**
+ * Oauth2 info in the manifest.
+ * See http://developer.chrome.com/apps/app_identity.html#update_manifest.
+ * @constructor
+ */
+chrome.runtime.Manifest.Oauth2 = function() {};
+
+
+/** @type {string} */
+chrome.runtime.Manifest.Oauth2.prototype.client_id;
+
+
+/**
+ * http://developer.chrome.com/extensions/runtime.html#method-getManifest
+ * @return {!chrome.runtime.Manifest} The full manifest file of the app or
+ *     extension.
  */
 chrome.runtime.getManifest = function() {};
 
@@ -589,6 +945,7 @@ chrome.tabs.reload = function(opt_tabId, opt_reloadProperties, opt_callback) {};
  */
 chrome.tabs.remove = function(tabIds, opt_callback) {};
 
+
 /**
  * @param {number} tabId Tab id.
  * @param {*} request The request value of any type.
@@ -596,6 +953,7 @@ chrome.tabs.remove = function(tabIds, opt_callback) {};
  *     takes a JSON response object sent by the handler of the request.
  */
 chrome.tabs.sendMessage = function(tabId, request, opt_callback) {};
+
 
 /**
  * @param {number} tabId Tab id.
@@ -617,6 +975,10 @@ chrome.tabs.update = function(tabId, updateProperties, opt_callback) {};
 
 /** @type {ChromeEvent} */
 chrome.tabs.onActiveChanged;
+
+
+/** @type {ChromeEvent} */
+chrome.tabs.onActivated;
 
 
 /** @type {ChromeEvent} */
@@ -645,6 +1007,10 @@ chrome.tabs.onRemoved;
 
 /** @type {ChromeEvent} */
 chrome.tabs.onUpdated;
+
+
+/** @type {ChromeEvent} */
+chrome.tabs.onReplaced;
 
 // DEPRECATED:
 // TODO(user): Remove once all usage has been confirmed to have ended.
@@ -849,6 +1215,18 @@ chrome.browserAction.setTitle = function(details) {};
 
 /** @type {ChromeEvent} */
 chrome.browserAction.onClicked;
+
+
+/**
+ * @param {number} tabId the ID of the tab on which to disable this action.
+ */
+chrome.browserAction.disable = function(tabId) {};
+
+
+/**
+ * @param {number} tabId the ID of the tab on which to enable this action.
+ */
+chrome.browserAction.enable = function(tabId) {};
 
 
 /**
@@ -1126,6 +1504,7 @@ CookieChangeInfo.prototype.cookie;
 /** @type {string} */
 CookieChangeInfo.prototype.cause;
 
+
 /** @const */
 chrome.management = {};
 
@@ -1175,10 +1554,22 @@ chrome.management.setEnabled = function(id, enabled, callback) {};
 
 
 /**
- * @param {string} id
- * @param {function(): void} callback
+ * @param {string} id The id of an already installed extension.
+ * @param {(Object|function(): void)=} opt_optionsOrCallback An optional
+ *     uninstall options object or an optional callback function.
+ * @param {function(): void=} opt_callback An optional callback function.
  */
-chrome.management.uninstall = function(id, callback) {};
+chrome.management.uninstall =
+    function(id, opt_optionsOrCallback, opt_callback) {};
+
+
+/**
+ * @param {(Object|function(): void)=} opt_optionsOrCallback An optional
+ *     uninstall options object or an optional callback function.
+ * @param {function(): void=} opt_callback An optional callback function.
+ */
+chrome.management.uninstallSelf =
+    function(opt_optionsOrCallback, opt_callback) {};
 
 
 /** @type {ChromeEvent} */
@@ -1423,12 +1814,58 @@ chrome.history.onVisited;
 
 /**
  * @const
+ * @see https://developer.chrome.com/apps/identity.html
+ */
+chrome.identity = {};
+
+
+/**
+ * @param {(chrome.identity.TokenDetails|function(string=): void)}
+ *     detailsOrCallback Token options or a callback function if no options are
+ *     specified.
+ * @param {function(string=): void=} opt_callback A callback function if options
+ *     are specified.
+ */
+chrome.identity.getAuthToken = function(detailsOrCallback, opt_callback) {};
+
+
+/** @typedef {{interactive: (boolean|undefined)}} */
+chrome.identity.TokenDetails;
+
+
+/**
+ * @param {chrome.identity.InvalidTokenDetails} details
+ * @param {function(): void} callback
+ */
+chrome.identity.removeCachedAuthToken = function(details, callback) {};
+
+
+/** @typedef {{token: string}} */
+chrome.identity.InvalidTokenDetails;
+
+
+/**
+ * @param {chrome.identity.WebAuthFlowDetails} details
+ * @param {function(string=): void} callback
+ */
+chrome.identity.launchWebAuthFlow = function(details, callback) {};
+
+
+/** @typedef {{url: string, interactive: (boolean|undefined)}} */
+chrome.identity.WebAuthFlowDetails;
+
+
+/**
+ * @const
  * @see http://code.google.com/chrome/extensions/input.ime.html
  */
 chrome.input = {};
 
+
 /** @const */
 chrome.input.ime = {};
+
+
 
 /**
  * The OnKeyEvent event takes an extra argument.
@@ -1452,11 +1889,13 @@ ChromeInputImeOnKeyEventEvent.prototype.addListener =
  */
 ChromeInputImeOnKeyEventEvent.prototype.removeListener = function(callback) {};
 
+
 /**
  * @param {function(string, !ChromeKeyboardEvent): (boolean|undefined)} callback
  *     callback.
  */
 ChromeInputImeOnKeyEventEvent.prototype.hasListener = function(callback) {};
+
 
 /**
  * @param {function(string, !ChromeKeyboardEvent): (boolean|undefined)} callback
@@ -1535,6 +1974,7 @@ chrome.input.ime.setMenuItems = function(parameters, opt_callback) {};
  */
 chrome.input.ime.updateMenuItems = function(parameters, opt_callback) {};
 
+
 /**
  * @param {string} requestId Request id of the event that was handled. This
  *     should come from keyEvent.requestId.
@@ -1575,8 +2015,19 @@ chrome.input.ime.onKeyEvent;
 chrome.input.ime.onMenuItemActivated;
 
 
-/** @const namespace */
+/**
+ * namespace
+ * @const
+ */
 chrome.mediaGalleries = {};
+
+
+/**
+ * @param {!FileSystem} mediaFileSystem The file system to get metadata for.
+ * @return {!{name: string, galleryId: string, deviceId: (string|undefined),
+ *     isRemovable: boolean, isMediaDevice: boolean}}
+ */
+chrome.mediaGalleries.getMediaFileSystemMetadata = function(mediaFileSystem) {};
 
 
 /**
@@ -1600,35 +2051,45 @@ chrome.pageCapture = {};
  */
 chrome.pageCapture.saveAsMHTML = function(details, callback) {};
 
+
 /**
  * @const
  * @see http://code.google.com/chrome/extensions/permissions.html
  */
 chrome.permissions = {};
 
+/**
+ * @typedef {{
+ *   permissions: (Array.<string>|undefined),
+ *   origins: (Array.<string>|undefined)
+ * }}
+* @see http://developer.chrome.com/extensions/permissions.html#type-Permissions
+*/
+chrome.permissions.Permissions;
 
 /**
- * @param {!Permissions} permissions Permissions.
+ * @param {!chrome.permissions.Permissions} permissions
  * @param {function(boolean): void} callback Callback function.
  */
 chrome.permissions.contains = function(permissions, callback) {};
 
 
 /**
- * @param {function(!Permissions): void} callback Callback function.
+ * @param {function(!chrome.permissions.Permissions): void} callback
+ *     Callback function.
  */
 chrome.permissions.getAll = function(callback) {};
 
 
 /**
- * @param {!Permissions} permissions Permissions.
+ * @param {!chrome.permissions.Permissions} permissions
  * @param {function(boolean): void=} opt_callback Callback function.
  */
 chrome.permissions.remove = function(permissions, opt_callback) {};
 
 
 /**
- * @param {!Permissions} permissions Permissions.
+ * @param {!chrome.permissions.Permissions} permissions
  * @param {function(boolean): void=} opt_callback Callback function.
  */
 chrome.permissions.request = function(permissions, opt_callback) {};
@@ -1640,6 +2101,25 @@ chrome.permissions.onAdded;
 
 /** @type {!ChromeEvent} */
 chrome.permissions.onRemoved;
+
+
+/**
+ * @see http://developer.chrome.com/dev/extensions/power.html
+ */
+chrome.power = {};
+
+
+/**
+ * @param {string} level A string describing the degree to which power
+ *     management should be disabled, should be either "system" or "display".
+ */
+chrome.power.requestKeepAwake = function(level) {};
+
+
+/**
+ * Releases a request previously made via requestKeepAwake().
+ */
+chrome.power.releaseKeepAwake = function() {};
 
 
 /**
@@ -1674,6 +2154,313 @@ chrome.proxy.settings;
 
 /** @type {ChromeEvent} */
 chrome.proxy.onProxyError;
+
+
+/**
+ * @const
+ * @see http://developer.chrome.com/apps/socket.html
+ */
+chrome.socket = {};
+
+
+/**
+ * @constructor
+ */
+chrome.socket.CreateInfo = function() {};
+
+
+/** @type {number} */
+chrome.socket.CreateInfo.prototype.socketId;
+
+
+/**
+ * @constructor
+ */
+chrome.socket.ReadInfo = function() {};
+
+
+/** @type {number} */
+chrome.socket.ReadInfo.prototype.resultCode;
+
+
+/** @type {!ArrayBuffer} */
+chrome.socket.ReadInfo.prototype.data;
+
+
+/**
+ * @constructor
+ */
+chrome.socket.WriteInfo = function() {};
+
+
+/** @type {number} */
+chrome.socket.WriteInfo.prototype.bytesWritten;
+
+
+/**
+ * @constructor
+ */
+chrome.socket.RecvFromInfo = function() {};
+
+
+/** @type {number} */
+chrome.socket.RecvFromInfo.prototype.resultCode;
+
+
+/** @type {!ArrayBuffer} */
+chrome.socket.RecvFromInfo.prototype.data;
+
+
+/** @type {string} */
+chrome.socket.RecvFromInfo.prototype.address;
+
+
+/** @type {number} */
+chrome.socket.RecvFromInfo.prototype.port;
+
+
+/**
+ * @constructor
+ */
+chrome.socket.AcceptInfo = function() {};
+
+
+/** @type {number} */
+chrome.socket.AcceptInfo.prototype.resultCode;
+
+
+/** @type {(number|undefined)} */
+chrome.socket.AcceptInfo.prototype.socketId;
+
+
+/**
+ * @constructor
+ */
+chrome.socket.SocketInfo = function() {};
+
+
+/** @type {string} */
+chrome.socket.SocketInfo.prototype.socketType;
+
+
+/** @type {boolean} */
+chrome.socket.SocketInfo.prototype.connected;
+
+
+/** @type {(string|undefined)} */
+chrome.socket.SocketInfo.prototype.peerAddress;
+
+
+/** @type {(number|undefined)} */
+chrome.socket.SocketInfo.prototype.peerPort;
+
+
+/** @type {(string|undefined)} */
+chrome.socket.SocketInfo.prototype.localAddress;
+
+
+/** @type {(number|undefined)} */
+chrome.socket.SocketInfo.prototype.localPort;
+
+
+/**
+ * @constructor
+ */
+chrome.socket.NetworkAdapterInfo = function() {};
+
+
+/** @type {string} */
+chrome.socket.NetworkAdapterInfo.prototype.name;
+
+
+/** @type {string} */
+chrome.socket.NetworkAdapterInfo.prototype.address;
+
+
+/**
+ * @param {string} type The type of socket to create. Must be 'tcp' or 'udp'.
+ * @param {(Object|function(!chrome.socket.CreateInfo))} optionsOrCallback The
+ *     socket options or callback.
+ * @param {function(!chrome.socket.CreateInfo)=} opt_callback Called when the
+ *     socket has been created.
+ */
+chrome.socket.create = function(type, optionsOrCallback, opt_callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket to destroy.
+ */
+chrome.socket.destroy = function(socketId) {};
+
+
+/**
+ * @param {number} socketId The id of the socket.
+ * @param {string} hostname The hostname or IP address of the remote machine.
+ * @param {number} port The port of the remote machine.
+ * @param {function(number)} callback Called when the connection attempt is
+ *     complete.
+ */
+chrome.socket.connect = function(socketId, hostname, port, callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket.
+ * @param {string} address The address of the local machine.
+ * @param {number} port The port of the local machine.
+ * @param {function(number)} callback Called when the bind attempt is complete.
+ */
+chrome.socket.bind = function(socketId, address, port, callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket to disconnect.
+ */
+chrome.socket.disconnect = function(socketId) {};
+
+
+/**
+ * @param {number} socketId The id of the socket to read from.
+ * @param {(number|function(!chrome.socket.ReadInfo))} bufferSizeOrCallback The
+ *     read buffer size or the callback.
+ * @param {function(!chrome.socket.ReadInfo)=} opt_callback Called with data
+ *     that was available to be read without blocking.
+ */
+chrome.socket.read = function(socketId, bufferSizeOrCallback, opt_callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket to write to.
+ * @param {!ArrayBuffer} data The data to write.
+ * @param {function(!chrome.socket.WriteInfo)} callback Called when the write
+ *     operation completes without blocking or an error occurs.
+ */
+chrome.socket.write = function(socketId, data, callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket to read from.
+ * @param {(number|function(!chrome.socket.RecvFromInfo))} bufferSizeOrCallback
+ *     The read buffer size or the callback.
+ * @param {function(!chrome.socket.RecvFromInfo)=} opt_callback Called with data
+ *     that was available to be read without blocking.
+ */
+chrome.socket.recvFrom = function(socketId, bufferSizeOrCallback,
+    opt_callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket to write to.
+ * @param {!ArrayBuffer} data The data to write.
+ * @param {string} address The address of the remote machine.
+ * @param {number} port The port of the remote machine.
+ * @param {function(!chrome.socket.WriteInfo)} callback Called when the write
+ *     operation completes without blocking or an error occurs.
+ */
+chrome.socket.sendTo = function(socketId, data, address, port, callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket to listen on.
+ * @param {string} address The address of the local machine to listen on. Use
+ *     '0' to listen on all addresses.
+ * @param {number} port The port of the local machine.
+ * @param {(number|function(number))} backlogOrCallback The length of the
+ *     socket's listen queue or the callback.
+ * @param {function(number)=} opt_callback Called when the listen operation
+ *     completes.
+ */
+chrome.socket.listen =
+    function(socketId, address, port, backlogOrCallback, opt_callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket to accept a connection on.
+ * @param {function(!chrome.socket.AcceptInfo)} callback Called when a new
+ *     socket is accepted.
+ */
+chrome.socket.accept = function(socketId, callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket to listen on.
+ * @param {boolean} enable If true, enable keep-alive functionality.
+ * @param {(number|function(boolean))} delayOrCallback The delay in seconds
+ *     between the last packet received and the first keepalive probe (default
+ *     is 0) or the callback
+ * @param {function(boolean)=} opt_callback Called when the setKeepAlive attempt
+ *     is complete.
+ */
+chrome.socket.setKeepAlive = function(socketId, enable, delayOrCallback,
+    opt_callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket to listen on.
+ * @param {boolean} noDelay If true, disables Nagle's algorithm.
+ * @param {function(boolean)} callback Called when the setNoDelay attempt is
+ *     complete.
+ */
+chrome.socket.setNoDelay = function(socketId, noDelay, callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket.
+ * @param {function(!chrome.socket.SocketInfo)} callback Called when the state
+ *     is available.
+ */
+chrome.socket.getInfo = function(socketId, callback) {};
+
+
+/**
+ * @param {function(!Array.<!chrome.socket.NetworkAdapterInfo>)} callback Called
+ *     when local adapter information is available.
+ */
+chrome.socket.getNetworkList = function(callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket.
+ * @param {string} address The group address to join. Domain names are not
+ *     supported.
+ * @param {function(number)} callback Called when the join operation is done.
+ */
+chrome.socket.joinGroup = function(socketId, address, callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket.
+ * @param {string} address The group address to leave. Domain names are not
+ *     supported.
+ * @param {function(number)} callback Called when the leave operation is done.
+ */
+chrome.socket.leaveGroup = function(socketId, address, callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket.
+ * @param {number} ttl The time-to-live value.
+ * @param {function(number)} callback Called when the configuration operation is
+ *     done.
+ */
+chrome.socket.setMulticastTimeToLive = function(socketId, ttl, callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket.
+ * @param {boolean} enabled True to enable loopback mode.
+ * @param {function(number)} callback Called when the configuration operation is
+ *     done.
+ */
+chrome.socket.setMulticastLoopbackMode = function(socketId, enabled,
+    callback) {};
+
+
+/**
+ * @param {number} socketId The id of the socket.
+ * @param {function(!Array.<string>)} callback Called with an array of string
+ *     groups.
+ */
+chrome.socket.getJoinedGroups = function(socketId, callback) {};
 
 
 /**
@@ -2135,6 +2922,7 @@ chrome.pushMessaging.getChannelId =
     function(interactiveOrCallback, opt_callback) {};
 
 
+
 /**
  * Event whose listeners take a chrome.pushMessaging.Message parameter.
  * @constructor
@@ -2172,7 +2960,7 @@ chrome.pushMessaging.PushMessageEvent.prototype.hasListeners = function() {};
 
 
 /**
- * @see http://code.google.com/chrome/extensions/extension.html#type-Port
+ * @see https://developer.chrome.com/apps/runtime.html#type-Port
  * @constructor
  */
 function Port() {}
@@ -2562,22 +3350,6 @@ InputContext.prototype.type;
 
 
 /**
- * @see http://code.google.com/chrome/extensions/permissions.html#type-Permissions
- * @constructor
- */
-function Permissions() {}
-
-
-/** @type {!Array.<string>} */
-Permissions.prototype.permissions;
-
-
-/** @type {!Array.<string>} */
-Permissions.prototype.origins;
-
-
-
-/**
  * @see http://code.google.com/chrome/extensions/proxy.html#type-ProxyServer
  * @constructor
  */
@@ -2907,7 +3679,104 @@ chrome.pushMessaging.Message.prototype.payload;
  */
 chrome.pushMessaging.ChannelIdResult = function() {};
 
+
 /**
  * @type {string}
  */
 chrome.pushMessaging.ChannelIdResult.prototype.channelId;
+
+
+/**
+ * The {@code chrome.fileSystem} API makes use of the Entry and FileEntry types
+ * defined in {@code javascript/externs/fileapi.js}.
+ * @const
+ * @see http://developer.chrome.com/apps/fileSystem.html
+ */
+chrome.fileSystem = {};
+
+
+/**
+ * @param {!Entry} entry The entry to get the display path for. The entry can
+ *     originally be obtained through
+ *     {@code chrome.fileSystem.chooseEntry} or
+ *     {@code chrome.fileSystem.restoreEntry}.
+ * @param {function(string)} callback A success callback.
+ * @see http://developer.chrome.com/apps/fileSystem.html#method-getDisplayPath
+ */
+chrome.fileSystem.getDisplayPath = function(entry, callback) {};
+
+
+/**
+ * @param {!Entry} entry The entry to get a writable entry for.
+ * @param {function(!Entry)} callback A success callback.
+ * @see http://developer.chrome.com/apps/fileSystem.html#method-getWritableEntry
+ */
+chrome.fileSystem.getWriteableEntry = function(entry, callback) {};
+
+
+/**
+ * @param {!Entry} entry The entry to query writability.
+ * @param {function(boolean)} callback A success callback.
+ * @see http://developer.chrome.com/apps/fileSystem.html#method-isWritableEntry
+ */
+chrome.fileSystem.isWritableEntry = function(entry, callback) {};
+
+
+/**
+ * @typedef {{
+ *   description: (string|undefined),
+ *   mimeTypes: (!Array.<string>|undefined),
+ *   extensions: (!Array.<string>|undefined)
+ * }}
+ * @see http://developer.chrome.com/apps/fileSystem.html#method-chooseEntry
+ */
+chrome.fileSystem.AcceptsOption;
+
+
+/**
+ * @typedef {{
+ *   type: (string|undefined),
+ *   suggestedName: (string|undefined),
+ *   accepts: (!Array.<!chrome.fileSystem.AcceptsOption>|undefined),
+ *   acceptsAllTypes: (boolean|undefined),
+ *   acceptsMultiple: (boolean|undefined)
+ * }}
+ * @see http://developer.chrome.com/apps/fileSystem.html#method-chooseEntry
+ */
+chrome.fileSystem.ChooseEntryOptions;
+
+
+/**
+ * @param {!chrome.fileSystem.ChooseEntryOptions|
+ *     function(Entry=, !Array.<!FileEntry>=)} optionsOrCallback The
+ *     options for the file prompt or the callback.
+ * @param {function(Entry=, !Array.<!FileEntry>=)=} opt_callback A success
+ *     callback, if arg1 is options.
+ * @see http://developer.chrome.com/apps/fileSystem.html#method-chooseEntry
+ */
+chrome.fileSystem.chooseEntry = function(optionsOrCallback, opt_callback) {};
+
+
+/**
+ * @param {string} id The ID of the file entry to restore.
+ * @param {function(!Entry)} callback A success callback.
+ * @see http://developer.chrome.com/apps/fileSystem.html#method-restoreEntry
+ */
+chrome.fileSystem.restoreEntry = function(id, callback) {};
+
+
+/**
+ * @param {string} id The ID of the file entry to query restorability.
+ * @param {function(boolean)} callback A success callback.
+ * @see http://developer.chrome.com/apps/fileSystem.html#method-isRestorable
+ */
+chrome.fileSystem.isRestorable = function(id, callback) {};
+
+
+/**
+ * @param {!Entry} entry The entry to regain access to.
+ * @return {string} The ID that can be passed to restoreEntry to regain access
+ *     to the given file entry.
+ * @see http://developer.chrome.com/apps/fileSystem.html#method-retainEntry
+ */
+chrome.fileSystem.retainEntry = function(entry) {};

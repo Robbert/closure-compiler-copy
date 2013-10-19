@@ -102,8 +102,7 @@ public class SemanticReverseAbstractInterpreter
   /**
    * Merging function for inequality comparisons between types.
    */
-  private final
-      Function<TypePair, TypePair> INEQ =
+  private final Function<TypePair, TypePair> ineq =
     new Function<TypePair, TypePair>() {
       @Override
       public TypePair apply(TypePair p) {
@@ -233,7 +232,7 @@ public class SemanticReverseAbstractInterpreter
       case Token.GE:
       case Token.GT:
         if (outcome) {
-          return caseEquality(condition, blindScope, INEQ);
+          return caseEquality(condition, blindScope, ineq);
         }
         break;
 
@@ -357,7 +356,11 @@ public class SemanticReverseAbstractInterpreter
         left, blindScope, !condition);
     StaticSlot<JSType> leftVar = leftScope.findUniqueRefinedSlot(blindScope);
     if (leftVar == null) {
-      return blindScope;
+      // If we did create a more precise scope, blindScope has a child and
+      // it is frozen. We can't just throw it away to return it. So we
+      // must create a child instead.
+      return blindScope == leftScope ?
+          blindScope : blindScope.createChildFlowScope();
     }
     FlowScope rightScope = firstPreciserScopeKnowingConditionOutcome(
         left, blindScope, condition);
@@ -365,7 +368,8 @@ public class SemanticReverseAbstractInterpreter
         right, rightScope, !condition);
     StaticSlot<JSType> rightVar = rightScope.findUniqueRefinedSlot(blindScope);
     if (rightVar == null || !leftVar.getName().equals(rightVar.getName())) {
-      return blindScope;
+      return blindScope == rightScope ?
+          blindScope : blindScope.createChildFlowScope();
     }
     JSType type = leftVar.getType().getLeastSupertype(rightVar.getType());
     FlowScope informed = blindScope.createChildFlowScope();

@@ -159,9 +159,11 @@ public class FunctionType extends PrototypeObjectType {
   }
 
   /** Creates an instance for a function that is an interface. */
-  private FunctionType(JSTypeRegistry registry, String name, Node source) {
+  private FunctionType(JSTypeRegistry registry, String name, Node source,
+      TemplateTypeMap typeParameters) {
     super(registry, name,
-        registry.getNativeObjectType(JSTypeNative.FUNCTION_INSTANCE_TYPE));
+        registry.getNativeObjectType(JSTypeNative.FUNCTION_INSTANCE_TYPE),
+        false, typeParameters);
     setPrettyPrint(true);
 
     Preconditions.checkArgument(source == null ||
@@ -175,8 +177,9 @@ public class FunctionType extends PrototypeObjectType {
 
   /** Creates an instance for a function that is an interface. */
   static FunctionType forInterface(
-      JSTypeRegistry registry, String name, Node source) {
-    return new FunctionType(registry, name, source);
+      JSTypeRegistry registry, String name, Node source,
+      TemplateTypeMap typeParameters) {
+    return new FunctionType(registry, name, source, typeParameters);
   }
 
   @Override
@@ -421,6 +424,15 @@ public class FunctionType extends PrototypeObjectType {
   }
 
   /**
+   * Extends the TemplateTypeMap of the function's this type, based on the
+   * specified type.
+   * @param type
+   */
+  public void extendTemplateTypeMapBasedOn(ObjectType type) {
+    typeOfThis.extendTemplateTypeMap(type.getTemplateTypeMap());
+  }
+
+  /**
    * Sets the prototype.
    * @param prototype the prototype. If this value is {@code null} it will
    *        silently be discarded.
@@ -527,6 +539,7 @@ public class FunctionType extends PrototypeObjectType {
       // Records this type for each implemented interface.
       for (ObjectType type : implementedInterfaces) {
         registry.registerTypeImplementingInterface(this, type);
+        typeOfThis.extendTemplateTypeMap(type.getTemplateTypeMap());
       }
       this.implementedInterfaces = ImmutableList.copyOf(implementedInterfaces);
     } else {
@@ -576,6 +589,10 @@ public class FunctionType extends PrototypeObjectType {
     throws UnsupportedOperationException {
     if (isInterface()) {
       this.extendedInterfaces = ImmutableList.copyOf(extendedInterfaces);
+      for (ObjectType extendedInterface : this.extendedInterfaces) {
+        typeOfThis.extendTemplateTypeMap(
+            extendedInterface.getTemplateTypeMap());
+      }
     } else {
       throw new UnsupportedOperationException();
     }

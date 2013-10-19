@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Closure Compiler Authors
+ * Copyright 2008 The Closure Compiler Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -277,12 +277,6 @@ XPathResult.FIRST_ORDERED_NODE_TYPE = 9;
 function XPathNamespace() {}
 
 /**
- * @type {Element}
- * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathNamespace-ownerElement
- */
-XPathNamespace.prototype.ownerElement;
-
-/**
  * @const
  * @type {number}
  * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPATH_NAMESPACE_NODE
@@ -290,10 +284,10 @@ XPathNamespace.prototype.ownerElement;
 XPathNamespace.XPATH_NAMESPACE_NODE = 13;
 
 /**
- * @const {string}
- * @override
+ * @type {Element}
+ * @see http://www.w3.org/TR/DOM-Level-3-XPath/xpath.html#XPathNamespace-ownerElement
  */
-XPathNamespace.prototype.nodeName = "#namespace";
+XPathNamespace.prototype.ownerElement;
 
 /**
  * @type {!string} Not null
@@ -302,8 +296,13 @@ XPathNamespace.prototype.nodeName = "#namespace";
 XPathNamespace.prototype.namespaceURI;
 
 /**
+ * @const {string}
+ * @override
+ */
+XPathNamespace.prototype.nodeName = "#namespace";
+
+/**
  * @const
  * @type {number}
- * @override
  */
 XPathNamespace.prototype.nodeType = XPathNamespace.XPATH_NAMESPACE_NODE;

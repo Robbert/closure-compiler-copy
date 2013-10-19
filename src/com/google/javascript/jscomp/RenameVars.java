@@ -25,6 +25,7 @@ import com.google.javascript.jscomp.NodeTraversal.AbstractPostOrderCallback;
 import com.google.javascript.jscomp.NodeTraversal.ScopedCallback;
 import com.google.javascript.jscomp.Scope.Var;
 import com.google.javascript.rhino.Node;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -81,8 +82,8 @@ final class RenameVars implements CompilerPass {
 
   // Logic for bleeding functions, where the name leaks into the outer
   // scope on IE but not on other browsers.
-  private Set<Var> localBleedingFunctions = Sets.newHashSet();
-  private ArrayListMultimap<Scope, Var> localBleedingFunctionsPerScope =
+  private final Set<Var> localBleedingFunctions = Sets.newHashSet();
+  private final ArrayListMultimap<Scope, Var> localBleedingFunctionsPerScope =
       ArrayListMultimap.create();
 
   class Assignment {
@@ -122,7 +123,7 @@ final class RenameVars implements CompilerPass {
    *
    * @see NameAnonymousFunctions
    */
-  private boolean preserveFunctionExpressionNames;
+  private final boolean preserveFunctionExpressionNames;
 
   private final boolean shouldShadow;
 
@@ -133,12 +134,27 @@ final class RenameVars implements CompilerPass {
   // TODO(user): No longer needs to be public when shadowing doesn't use it.
   public static final String LOCAL_VAR_PREFIX = "L ";
 
+  // TODO(user): Temporary. To make checking in / merging DefaultPassConfig
+  // easier.
+  private final NameGenerator nameGeneratorGiven;
   RenameVars(AbstractCompiler compiler, String prefix,
       boolean localRenamingOnly, boolean preserveFunctionExpressionNames,
       boolean generatePseudoNames, boolean shouldShadow,
       VariableMap prevUsedRenameMap,
       @Nullable char[] reservedCharacters,
       @Nullable Set<String> reservedNames) {
+    this(compiler, prefix, localRenamingOnly, preserveFunctionExpressionNames,
+        generatePseudoNames, shouldShadow, prevUsedRenameMap,
+        reservedCharacters, reservedNames, null);
+
+  }
+  RenameVars(AbstractCompiler compiler, String prefix,
+      boolean localRenamingOnly, boolean preserveFunctionExpressionNames,
+      boolean generatePseudoNames, boolean shouldShadow,
+      VariableMap prevUsedRenameMap,
+      @Nullable char[] reservedCharacters,
+      @Nullable Set<String> reservedNames,
+      @Nullable NameGenerator nameGenerator) {
     this.compiler = compiler;
     this.prefix = prefix == null ? "" : prefix;
     this.localRenamingOnly = localRenamingOnly;
@@ -156,6 +172,7 @@ final class RenameVars implements CompilerPass {
     } else {
       this.reservedNames = Sets.newHashSet(reservedNames);
     }
+    this.nameGeneratorGiven = nameGenerator;
   }
 
   /**
@@ -191,8 +208,9 @@ final class RenameVars implements CompilerPass {
 
     @Override
     public void enterScope(NodeTraversal t) {
-      if (t.inGlobalScope()) return;
-
+      if (t.inGlobalScope()) {
+        return;
+      }
       Iterator<Var> it = t.getScope().getVars();
       while (it.hasNext()) {
         Var current = it.next();
@@ -408,7 +426,7 @@ final class RenameVars implements CompilerPass {
   private void recordPseudoName(Node n) {
     // Variable names should be in a different name space than
     // property pseudo names.
-    pseudoNameMap.put(n, '$' + n.getString() + "$$" );
+    pseudoNameMap.put(n, '$' + n.getString() + "$$");
   }
 
   /**
@@ -420,8 +438,7 @@ final class RenameVars implements CompilerPass {
     // If prevUsedRenameMap had duplicate values then this pass would be
     // non-deterministic.
     // In such a case, the following will throw an IllegalArgumentException.
-    Preconditions.checkState(
-        prevUsedRenameMap.getNewNameToOriginalNameMap() instanceof Map);
+    Preconditions.checkNotNull(prevUsedRenameMap.getNewNameToOriginalNameMap());
     for (Assignment a : assignments.values()) {
       String prevNewName = prevUsedRenameMap.lookupNewName(a.oldName);
       if (prevNewName == null || reservedNames.contains(prevNewName)) {
@@ -441,13 +458,21 @@ final class RenameVars implements CompilerPass {
    * Determines which new names to substitute for the original names.
    */
   private void assignNames(SortedSet<Assignment> varsToRename) {
-    NameGenerator globalNameGenerator =
-        new NameGenerator(reservedNames, prefix, reservedCharacters);
+    NameGenerator globalNameGenerator = null;
+    NameGenerator localNameGenerator = null;
 
-    // Local variables never need a prefix.
-    NameGenerator localNameGenerator =
-        prefix.isEmpty() ? globalNameGenerator : new NameGenerator(
-            reservedNames, "", reservedCharacters);
+    if (nameGeneratorGiven != null) {
+      globalNameGenerator = localNameGenerator = nameGeneratorGiven;
+      nameGeneratorGiven.restartNaming();
+    } else {
+      globalNameGenerator =
+          new NameGenerator(reservedNames, prefix, reservedCharacters);
+
+      // Local variables never need a prefix.
+      localNameGenerator =
+          prefix.isEmpty() ? globalNameGenerator : new NameGenerator(
+              reservedNames, "", reservedCharacters);
+    }
 
     // Generated names and the assignments for non-local vars.
     List<Assignment> pendingAssignments = new ArrayList<Assignment>();

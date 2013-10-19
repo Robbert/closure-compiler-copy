@@ -449,7 +449,7 @@ public class TypedScopeCreatorTest extends CompilerTestCase {
     assertFalse(x.isPropertyTypeDeclared("alert"));
 
     ObjectType y = (ObjectType) findNameType("y", globalScope);
-    assertEquals("?",
+    assertEquals("function (this:Window, ?): undefined",
         y.getPropertyType("alert").toString());
   }
 
@@ -548,9 +548,7 @@ public class TypedScopeCreatorTest extends CompilerTestCase {
     assertEquals("function (this:I): undefined",
         iPrototype.getPropertyType("baz").toString());
 
-    // should not be null
-    assertNull(globalScope.getVar("I.prototype"));
-    // assertEquals(iPrototype, globalScope.getVar("I.prototype").getType());
+    assertEquals(iPrototype, globalScope.getVar("I.prototype").getType());
   }
 
   // TODO(johnlenz): A syntax for stubs using object literals?
@@ -1203,6 +1201,308 @@ public class TypedScopeCreatorTest extends CompilerTestCase {
         findNameType("g", lastLocalScope).toString());
   }
 
+  public void disable_testTemplateType13() {
+    // TODO(johnlenz): allow template types in @type function expressions
+    testSame(
+        "/**\n" +
+        " * @type {function(T):T}\n" +
+        " * @template T\n" +
+        " */\n" +
+        "var f;" +
+        "/** @type {string} */\n" +
+        "var val = 'hi';\n" +
+        "var result = f(val);");
+    assertEquals("(string|undefined)",
+        findNameType("result", globalScope).toString());
+  }
+
+  public void testClassTemplateType1() {
+    // Verify that template types used in method signature are resolved.
+    testSame(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "function C() {};\n" +
+        "" +
+        "/** @return {T} */\n" +
+        "C.prototype.method = function() {}\n" +
+        "" +
+        "/** @type {C.<string>} */ var x = new C();\n" +
+        "var result = x.method();\n");
+    assertEquals("string", findNameType("result", globalScope).toString());
+  }
+
+  public void testClassTemplateType2() {
+    // Verify that template types used in method signature on namespaced
+    // objects are resolved.
+    testSame(
+        "/** @const */ var ns = {};" +
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "ns.C = function() {};\n" +
+        "" +
+        "/** @return {T} */\n" +
+        "ns.C.prototype.method = function() {}\n" +
+        "" +
+        "/** @type {ns.C.<string>} */ var x = new ns.C();\n" +
+        "var result = x.method();\n");
+    assertEquals("string", findNameType("result", globalScope).toString());
+  }
+
+  public void testClassTemplateType3() {
+    // Verify that template types used for instance properties are recognized.
+    testSame(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "function C() {\n" +
+        "  /** @type {T} */\n" +
+        "  this.foo;" +
+        "};\n" +
+        "" +
+        "/** @type {C.<string>} */ var x = new C();\n" +
+        "var result = x.foo;\n");
+    assertEquals("string", findNameType("result", globalScope).toString());
+  }
+
+  public void testClassTemplateType4() {
+    // Verify that template types used for instance properties are recognized.
+    testSame(
+        "/** @const */ var ns = {};" +
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "ns.C = function() {\n" +
+        "  /** @type {T} */\n" +
+        "  this.foo;" +
+        "};\n" +
+        "" +
+        "/** @type {ns.C.<string>} */ var x = new ns.C();\n" +
+        "var result = x.foo;\n");
+    assertEquals("string", findNameType("result", globalScope).toString());
+  }
+
+  public void testClassTemplateType5() {
+    // Verify that template types used for prototype properties in stub
+    // declarations are recognized.
+    testSame(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "function C() {\n" +
+        "};\n" +
+        "" +
+        "/** @type {T} */" +
+        "C.prototype.foo;\n" +
+        "" +
+        "/** @type {C.<string>} */ var x = new C();\n" +
+        "var result = x.foo;\n");
+    assertEquals("string", findNameType("result", globalScope).toString());
+  }
+
+  public void testClassTemplateType6() {
+    // Verify that template types used for prototype properties in assignment
+    // expressions are recognized.
+    testSame(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "function C() {\n" +
+        "};\n" +
+        "" +
+        "/** @type {T} */" +
+        "C.prototype.foo = 1;\n" +
+        "" +
+        "/** @type {C.<string>} */ var x = new C();\n" +
+        "var result = x.foo;\n");
+    assertEquals("string", findNameType("result", globalScope).toString());
+  }
+
+  public void testClassTemplateType7() {
+    // Verify that template types used in prototype methods are recognized.
+    testSame(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "function C() {};\n" +
+        "" +
+        "C.prototype.method = function() {\n" +
+        "  /** @type {T} */ var local;" +
+        "}\n");
+    assertEquals("T", findNameType("local", lastLocalScope).toString());
+  }
+
+  public void testClassTemplateType8() {
+    // Verify that template types used in casts are recognized.
+    testSame(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "function C() {};\n" +
+        "" +
+        "C.prototype.method = function() {\n" +
+        "  var local = /** @type {T} */ (x);" +
+        "}\n");
+    assertEquals("T", findNameType("local", lastLocalScope).toString());
+  }
+
+  public void testClassTemplateInheritance1() {
+    // Verify that template type inheritance works for prototype properties.
+    testSame(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "function C() {};\n" +
+        "" +
+        "/** @type {T} */" +
+        "C.prototype.foo = 1;\n" +
+        "" +
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T, U\n" +
+        " * @extends {C.<U>}" +
+        " */\n" +
+        "function D() {};\n" +
+        "" +
+        "/** @type {T} */" +
+        "D.prototype.bar;\n" +
+        "" +
+        "/** @type {D.<string, number>} */ var x = new D();\n" +
+        "var result1 = x.foo;\n" +
+        "var result2 = x.bar;\n");
+    assertEquals("number", findNameType("result1", globalScope).toString());
+    assertEquals("string", findNameType("result2", globalScope).toString());
+  }
+
+  public void testClassTemplateInheritance2() {
+    // Verify that template type inheritance works for properties and methods.
+    testSame(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "function C() {};\n" +
+        "" +
+        "/** @return {T} */\n" +
+        "C.prototype.method1 = function() {}\n" +
+        "" +
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T, U\n" +
+        " * @extends {C.<U>}" +
+        " */\n" +
+        "function D() {};\n" +
+        "" +
+        "/** @return {T} */\n" +
+        "D.prototype.method2 = function() {}\n" +
+        "" +
+        "/** @type {D.<boolean, string>} */ var x = new D();\n" +
+        "var result1 = x.method1();\n" +
+        "var result2 = x.method2();\n");
+    assertEquals("string", findNameType("result1", globalScope).toString());
+    assertEquals("boolean", findNameType("result2", globalScope).toString());
+  }
+
+  public void testClassTemplateInheritance3() {
+    // Verify that template type inheritance works when the superclass template
+    // types are not specified.
+    testSame(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "function C() {\n" +
+        "  /** @type {T} */\n" +
+        "  this.foo;" +
+        "};\n" +
+        "" +
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " * @extends {C}" +
+        " */\n" +
+        "function D() {\n" +
+        "  /** @type {T} */\n" +
+        "  this.bar;" +
+        "};\n" +
+        "" +
+        "/** @type {D.<boolean>} */ var x = new D();\n" +
+        "var result1 = x.foo;\n" +
+        "var result2 = x.bar;\n");
+    assertEquals("?", findNameType("result1", globalScope).toString());
+    assertEquals("boolean", findNameType("result2", globalScope).toString());
+  }
+
+  public void testClassTemplateInheritance4() {
+    // Verify that overriding methods works with template type inheritance.
+    testSame(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "function C() {};\n" +
+        "" +
+        "/** @return {T} */\n" +
+        "C.prototype.method = function() {}\n" +
+        "" +
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T, U\n" +
+        " * @extends {C.<U>}" +
+        " */\n" +
+        "function D() {};\n" +
+        "" +
+        "/** @override */\n" +
+        "D.prototype.method = function() {}\n" +
+        "" +
+        "/** @type {D.<boolean, string>} */ var x = new D();\n" +
+        "var result = x.method();\n");
+    assertEquals("string", findNameType("result", globalScope).toString());
+  }
+
+  public void testClassTemplateInheritance5() {
+    // Verify that overriding methods works with template type inheritance.
+    testSame(
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T\n" +
+        " */\n" +
+        "function C() {};\n" +
+        "" +
+        "/** @return {T} */\n" +
+        "C.prototype.method1 = function() {}\n" +
+        "" +
+        "/**\n" +
+        " * @constructor\n" +
+        " * @template T, U\n" +
+        " * @extends {C.<U>}" +
+        " */\n" +
+        "function D() {};\n" +
+        "" +
+        "/** @return {T} */\n" +
+        "D.prototype.method2 = function() {}\n" +
+        "" +
+        "/** @type {D.<string, boolean>} */ var x = new D();\n" +
+        "/** @type {C.<boolean>} */ var y = x;\n" +
+        "/** @type {C} */ var z = y;\n" +
+        "var result1 = x.method2();\n" +
+        "var result2 = y.method1();\n" +
+        "var result3 = z.method1();\n");
+    assertEquals("string", findNameType("result1", globalScope).toString());
+    assertEquals("boolean", findNameType("result2", globalScope).toString());
+    assertEquals("T", findNameType("result3", globalScope).toString());
+  }
+
   public void testClosureParameterTypesWithoutJSDoc() {
     testSame(
         "/**\n" +
@@ -1219,8 +1519,8 @@ public class TypedScopeCreatorTest extends CompilerTestCase {
         " * @param {function(!Object)} bar\n" +
         " */\n" +
         "function foo(bar) {}\n" +
-        "foo((/** @type {function(string)} */" +
-        "function(baz) { var f = baz; }))\n");
+        "foo(/** @type {function(string)} */" +
+        "  (function(baz) { var f = baz; }))\n");
     assertEquals("string", findNameType("f", lastLocalScope).toString());
   }
 
