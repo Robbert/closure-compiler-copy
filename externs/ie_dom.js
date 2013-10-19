@@ -370,11 +370,12 @@ Window.prototype.XMLHttpRequest;
 // Functions
 
 /**
+ * @see http://msdn.microsoft.com/en-us/library/mm536343(v=vs.85).aspx
  * @param {string} event
- * @param {Function} handler
- * @see http://msdn.microsoft.com/en-us/library/ms536343(VS.85).aspx
+ * @param {function(Event)} handler
+ * @return {boolean}
  */
-Window.prototype.attachEvent;
+Window.prototype.attachEvent = function (event, handler) {};
 
 /**
  * @see http://msdn.microsoft.com/en-us/library/ms536392(VS.85).aspx
@@ -895,11 +896,12 @@ Document.prototype.XSLDocument;
 // functions
 
 /**
+ * @see http://msdn.microsoft.com/en-us/library/mm536343(v=vs.85).aspx
  * @param {string} event
- * @param {Function} handler
- * @see http://msdn.microsoft.com/en-us/library/ms536343(VS.85).aspx
+ * @param {function(Event)} handler
+ * @return {boolean}
  */
-Document.prototype.attachEvent;
+Document.prototype.attachEvent = function (event, handler) {};
 
 /**
  * @see http://msdn.microsoft.com/en-us/library/ms536390(VS.85).aspx
@@ -992,11 +994,12 @@ Document.prototype.scripts;
 Element.prototype.addBehavior = function(sUrl) {};
 
 /**
- * @param {string} event
- * @param {Function} handler
  * @see http://msdn.microsoft.com/en-us/library/mm536343(v=vs.85).aspx
+ * @param {string} event
+ * @param {function(Event)} handler
+ * @return {boolean}
  */
-Element.prototype.attachEvent;
+Element.prototype.attachEvent = function (event, handler) {};
 
 /**
  * @type {boolean}
@@ -1048,7 +1051,7 @@ Element.prototype.currentStyle;
  * @param {Function} handler
  * @see http://msdn.microsoft.com/en-us/library/mm536343(v=vs.85).aspx
  */
-Element.prototype.detachEvent;
+Element.prototype.detachEvent = function (event, handler) { };;
 
 /**
  * @param {string=} opt_action
@@ -1058,8 +1061,11 @@ Element.prototype.doScroll = function(opt_action) {};
 
 /**
  * @see http://msdn.microsoft.com/en-us/library/ms536423(VS.85).aspx
+ * @param {string} type
+ * @param {*=} evt
+ * @return {boolean}
  */
-Element.prototype.fireEvent;
+Element.prototype.fireEvent = function (type, evt) { };
 
 /**
  * @type {boolean}
