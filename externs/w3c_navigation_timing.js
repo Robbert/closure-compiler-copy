@@ -151,5 +151,11 @@ Performance.prototype.now = function() {};
  */
 Performance.prototype.webkitNow = function() {};
 
-/** @type {Performance} */
+/**
+ * window.performance can be null in some cases:
+ * @see https://bugzilla.mozilla.org/show_bug.cgi?id=804069
+ * @see https://bugzilla.mozilla.org/show_bug.cgi?id=694612
+ * 
+ * @type {?Performance}
+ */
 Window.prototype.performance;
