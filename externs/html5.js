@@ -2705,6 +2705,16 @@ HTMLEmbedElement.prototype.src;
  */
 HTMLEmbedElement.prototype.type;
 
+/**
+ * @constructor
+ * @extends {HTMLElement}
+ * @see https://dvcs.w3.org/hg/webcomponents/raw-file/default/spec/templates/index.html#api-html-template-element
+ */
+function HTMLTemplateElement() {}
+
+/** @type {DocumentFragment} */
+HTMLTemplateElement.prototype.content;
+
 // Fullscreen APIs.
 
 /**

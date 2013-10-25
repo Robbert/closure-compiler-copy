@@ -303,6 +303,7 @@ XPathNamespace.prototype.nodeName = "#namespace";
 
 /**
  * @const
+ * @override
  * @type {number}
  */
 XPathNamespace.prototype.nodeType = XPathNamespace.XPATH_NAMESPACE_NODE;
