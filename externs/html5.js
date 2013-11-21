@@ -2908,6 +2908,13 @@ Document.prototype.visibilityState;
  */
 Document.prototype.hidden;
 
+/**
+ * @param {string=} title
+ * @return {HTMLDocument}
+ * @see http://dom.spec.whatwg.org/#dom-domimplementation-createhtmldocument
+ * @nosideeffects
+ */
+DOMImplementation.prototype.createHTMLDocument = function(title) {};
 
 /**
  * @see https://github.com/promises-aplus/promises-spec
