@@ -21,6 +21,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.debugging.sourcemap.SourceMapConsumerV3.EntryVisitor;
 
+import org.json.JSONObject;
+
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -35,9 +37,32 @@ import javax.annotation.Nullable;
  * Collects information mapping the generated (compiled) source back to
  * its original source for debugging purposes.
  *
+ * Source Map Revision 3 Proposal:
+ * https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit?usp=sharing
+ *
  * @author johnlenz@google.com (John Lenz)
  */
 public class SourceMapGeneratorV3 implements SourceMapGenerator {
+
+  /**
+   * This interface provides the merging strategy when an extension conflict
+   * appears because of merging two source maps on method
+   * {@link #mergeMapSection}.
+   */
+  public interface ExtensionMergeAction {
+
+    /**
+     * Returns the merged value between two extensions with the same name when
+     * merging two source maps
+     *
+     * @param extensionKey The extension name in conflict
+     * @param currentValue The extension value in the current source map
+     * @param newValue The extension value in the input source map
+     * @return The merged value
+     */
+    Object merge(String extensionKey, Object currentValue,
+        Object newValue);
+  }
 
   private static final int UNMAPPED = -1;
 
@@ -87,6 +112,18 @@ public class SourceMapGeneratorV3 implements SourceMapGenerator {
    */
   private FilePosition prefixPosition = new FilePosition(0, 0);
 
+  /**
+   * A list of extensions to be added to sourcemap. The value is a object
+   * to permit single values, like strings or numbers, and JSONObject or
+   * JSONArray objects.
+   */
+  private LinkedHashMap<String, Object> extensions = Maps.newLinkedHashMap();
+
+  /**
+   * The source root path for relocating source fails or avoid duplicate values
+   * on the source entry.
+   */
+  private String sourceRootPath;
 
   /**
    * {@inheritDoc}
@@ -237,12 +274,53 @@ public class SourceMapGeneratorV3 implements SourceMapGenerator {
     }
   }
 
+  /**
+   * Merges current mapping with {@code mapSectionContents} considering the
+   * offset {@code (line, column)}. Any extension in the map section will be
+   * ignored.
+   *
+   * @param line The line offset
+   * @param column The column offset
+   * @param mapSectionContents The map section to be appended
+   * @throws SourceMapParseException
+   */
   public void mergeMapSection(int line, int column, String mapSectionContents)
       throws SourceMapParseException {
-     setStartingPosition(line, column);
-     SourceMapConsumerV3 section = new SourceMapConsumerV3();
-     section.parse(mapSectionContents);
-     section.visitMappings(new ConsumerEntryVisitor());
+    setStartingPosition(line, column);
+    SourceMapConsumerV3 section = new SourceMapConsumerV3();
+    section.parse(mapSectionContents);
+    section.visitMappings(new ConsumerEntryVisitor());
+  }
+
+  /**
+   * Works like {@link #mergeMapSection(int, int, String)}, except that
+   * extensions from the @{code mapSectionContents} are merged to the top level
+   * source map. For conflicts a {@code mergeAction} is performed.
+   *
+   * @param line The line offset
+   * @param column The column offset
+   * @param mapSectionContents The map section to be appended
+   * @param mergeAction The merge action for conflicting extensions
+   * @throws SourceMapParseException
+   */
+  public void mergeMapSection(int line, int column, String mapSectionContents,
+      ExtensionMergeAction mergeAction)
+      throws SourceMapParseException {
+    setStartingPosition(line, column);
+    SourceMapConsumerV3 section = new SourceMapConsumerV3();
+    section.parse(mapSectionContents);
+    section.visitMappings(new ConsumerEntryVisitor());
+    for (Entry<String, Object> entry : section.getExtensions().entrySet()) {
+       String extensionKey = entry.getKey();
+       if (extensions.containsKey(extensionKey)) {
+         extensions.put(extensionKey,
+             mergeAction.merge(extensionKey,
+                               extensions.get(extensionKey),
+                               entry.getValue()));
+       } else {
+         extensions.put(extensionKey, entry.getValue());
+       }
+     }
   }
 
   /**
@@ -257,7 +335,8 @@ public class SourceMapGeneratorV3 implements SourceMapGenerator {
    * 6.    sources: ["foo.js", "bar.js"],
    * 7.    names: ["src", "maps", "are", "fun"],
    * 8.    mappings: "a;;abcde,abcd,a;"
-   * 9.  }
+   * 9.    x_org_extension: value
+   * 10. }
    *
    * Line 1: The entire file is a single JSON object
    * Line 2: File revision (always the first entry in the object)
@@ -270,6 +349,7 @@ public class SourceMapGeneratorV3 implements SourceMapGenerator {
    * Line 7: A list of symbol names used by the "mapping" entry.  This list
    *     may be incomplete.
    * Line 8: The mappings field.
+   * Line 9: Any custom field (extension).
    */
   @Override
   public void appendTo(Appendable out, String name) throws IOException {
@@ -280,6 +360,11 @@ public class SourceMapGeneratorV3 implements SourceMapGenerator {
     appendFirstField(out, "version", "3");
     appendField(out, "file", escapeString(name));
     appendField(out, "lineCount", String.valueOf(maxLine + 1));
+
+    //optional source root
+    if (this.sourceRootPath != null && !this.sourceRootPath.isEmpty()) {
+      appendField(out, "sourceRoot", escapeString(this.sourceRootPath));
+    }
 
     // Add the mappings themselves.
     appendFieldStart(out, "mappings");
@@ -302,7 +387,81 @@ public class SourceMapGeneratorV3 implements SourceMapGenerator {
     out.append("]");
     appendFieldEnd(out);
 
+    // Extensions, only if there is any
+    for (String key : this.extensions.keySet()) {
+      Object objValue = this.extensions.get(key);
+      String value = new String(objValue.toString());
+      if (objValue instanceof String){
+        value = JSONObject.quote(value);
+      }
+      appendField(out, key, value);
+    }
+
     out.append("\n}\n");
+  }
+
+  /**
+   * A prefix to be added to the beginning of each sourceName passed to
+   * {@link #addMapping}. Debuggers expect (prefix + sourceName) to be a URL
+   * for loading the source code.
+   *
+   * @param path The URL prefix to save in the sourcemap file. (Not validated.)
+   */
+  public void setSourceRoot(String path){
+    this.sourceRootPath = path;
+  }
+
+  /**
+   * Adds field extensions to the json source map. The value is allowed to be
+   * any value accepted by json, eg. string, JSONObject, JSONArray, etc.
+   * {@link org.json.JSONObject#put(String, Object)}
+   *
+   * Extensions must follow the format x_orgranization_field (based on V3
+   * proposal), otherwise a {@code SourceMapParseExtension} will be thrown.
+   *
+   * @param name The name of the extension with format organization_field
+   * @param object The value of the extension as a valid json value
+   * @throws SourceMapParseException  if extension name is malformed
+   */
+  public void addExtension(String name, Object object)
+      throws SourceMapParseException{
+    if (!name.startsWith("x_")){
+      throw new SourceMapParseException("Extension '" + name +
+                                        "' must start with 'x_'");
+    }
+    this.extensions.put(name, object);
+  }
+
+  /**
+   * Removes an extension by name if present.
+   *
+   * @param name The name of the extension with format organization_field
+   */
+  public void removeExtension(String name) {
+    if (this.extensions.containsKey(name)) {
+      this.extensions.remove(name);
+    }
+  }
+
+  /**
+   * Check whether or not the sourcemap has an extension.
+   *
+   * @param name The name of the extension with format organization_field
+   * @return If the extension exist
+   */
+  public boolean hasExtension(String name) {
+    return this.extensions.containsKey(name);
+  }
+
+  /**
+   * Returns the value mapped by the specified extension
+   * or {@code null} if this extension does not exist.
+   *
+   * @param name
+   * @return the extension value or {@code null}
+   */
+  public Object getExtension(String name) {
+    return this.extensions.get(name);
   }
 
   /**

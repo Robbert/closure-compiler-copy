@@ -1188,15 +1188,6 @@ public final class NodeUtil {
    * 14 call, member () [] .
    */
   static int precedence(int type) {
-    int precedence = precedenceWithDefault(type);
-    if (precedence != -1) {
-      return precedence;
-    }
-    throw new Error("Unknown precedence for " +
-        Token.name(type) + " (type " + type + ")");
-  }
-
-  static int precedenceWithDefault(int type) {
     switch (type) {
       case Token.COMMA:  return 0;
       case Token.ASSIGN_BITOR:
@@ -1268,8 +1259,8 @@ public final class NodeUtil {
         return 16;
 
       default:
-        // Statements are lower precedence than expressions.
-        return -1;
+        throw new IllegalStateException("Unknown precedence for " +
+            Token.name(type) + " (type " + type + ")");
     }
   }
 
@@ -3084,7 +3075,7 @@ public final class NodeUtil {
   }
 
   /** Find the best JSDoc for the given node. */
-  static JSDocInfo getBestJSDocInfo(Node n) {
+  public static JSDocInfo getBestJSDocInfo(Node n) {
     JSDocInfo info = n.getJSDocInfo();
     if (info == null) {
       Node parent = n.getParent();

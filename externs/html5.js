@@ -1199,6 +1199,7 @@ HTMLInputElement.prototype.stepUp = function(opt_n) {};
 /**
  * @constructor
  * @extends {HTMLElement}
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement
  */
 function HTMLMediaElement() {}
 
@@ -1268,13 +1269,22 @@ HTMLMediaElement.prototype.readyState;
 /** @type {boolean} */
 HTMLMediaElement.prototype.seeking;
 
-/** @type {number} */
+/**
+ * The current time, in seconds.
+ * @type {number}
+ */
 HTMLMediaElement.prototype.currentTime;
 
-/** @type {number} */
+/**
+ * The start time, in seconds.
+ * @type {number}
+ */
 HTMLMediaElement.prototype.startTime;
 
-/** @type {number} */
+/**
+ * The length of the media in seconds.
+ * @type {number}
+ */
 HTMLMediaElement.prototype.duration;
 
 /** @type {boolean} */
@@ -1314,7 +1324,10 @@ HTMLMediaElement.prototype.pause = function() {};
 /** @type {boolean} */
 HTMLMediaElement.prototype.controls;
 
-/** @type {number} */
+/**
+ * The audio volume, from 0.0 (silent) to 1.0 (loudest).
+ * @type {number}
+ */
 HTMLMediaElement.prototype.volume;
 
 /** @type {boolean} */
@@ -2516,6 +2529,22 @@ DataView.prototype.setFloat64 = function(
     byteOffset, value, opt_littleEndian) {};
 
 /**
+ * Web Cryptography API
+ * @see http://www.w3.org/TR/WebCryptoAPI/
+ */
+
+/** @see https://developer.mozilla.org/en/DOM/window.crypto */
+Window.prototype.crypto;
+
+/**
+ * @see https://developer.mozilla.org/en/DOM/window.crypto.getRandomValues
+ * @param {!ArrayBufferView} typedArray
+ * @return {!ArrayBufferView}
+ * @throws {Error}
+ */
+Window.prototype.crypto.getRandomValues = function(typedArray) {};
+
+/**
  * Constraint Validation API properties and methods
  * @see http://www.w3.org/TR/2009/WD-html5-20090423/forms.html#the-constraint-validation-api
  */
@@ -2903,10 +2932,40 @@ function Audio(opt_src) {}
 Document.prototype.visibilityState;
 
 /**
+ * @type {string}
+ */
+Document.prototype.mozVisibilityState;
+
+/**
+ * @type {string}
+ */
+Document.prototype.webkitVisibilityState;
+
+/**
+ * @type {string}
+ */
+Document.prototype.msVisibilityState;
+
+/**
  * @see http://www.w3.org/TR/page-visibility/
  * @type {boolean}
  */
 Document.prototype.hidden;
+
+/**
+ * @type {boolean}
+ */
+Document.prototype.mozHidden;
+
+/**
+ * @type {boolean}
+ */
+Document.prototype.webkitHidden;
+
+/**
+ * @type {boolean}
+ */
+Document.prototype.msHidden;
 
 /**
  * @param {string=} title

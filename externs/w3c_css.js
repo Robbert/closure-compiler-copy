@@ -1094,7 +1094,37 @@ CSS2Properties.prototype.borderWidth;
 
 /**
  * @type {string|number}
- * @see http://www.w3.org/TR/DOM-Level-2-Style/css.html#CSS-CSS2Properties-bottom
+ * @see http://www.w3.org/TR/css3-background/#the-border-radius
+ */
+CSS2Properties.prototype.borderRadius;
+
+/**
+ * @type {string|number}
+ * @see http://www.w3.org/TR/css3-background/#the-border-radius
+ */
+CSS2Properties.prototype.borderBottomLeftRadius;
+
+/**
+ * @type {string|number}
+ * @see http://www.w3.org/TR/css3-background/#the-border-radius
+ */
+CSS2Properties.prototype.borderBottomRightRadius;
+
+/**
+ * @type {string|number}
+ * @see http://www.w3.org/TR/css3-background/#the-border-radius
+ */
+CSS2Properties.prototype.borderTopLeftRadius;
+
+/**
+ * @type {string|number}
+ * @see http://www.w3.org/TR/css3-background/#the-border-radius
+ */
+CSS2Properties.prototype.borderTopRightRadius;
+
+/**
+ * @type {string|number}
+ * @see http://www.w3.org/TR/DOM-Level-2-Style/css.html#CSS-CSSProperties-bottom
  */
 CSS2Properties.prototype.bottom;
 

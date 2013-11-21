@@ -317,6 +317,21 @@ chrome.app.window.AppWindow.prototype.getBounds = function() {};
 chrome.app.window.AppWindow.prototype.setBounds = function(bounds) {};
 
 
+/**
+ * @return {boolean}
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.isAlwaysOnTop = function() {};
+
+
+/**
+ * @param {boolean} alwaysOnTop Set whether the window should stay above most
+ *     other windows.
+ * @see http://developer.chrome.com/apps/app.window.html#type-AppWindow
+ */
+chrome.app.window.AppWindow.prototype.setAlwaysOnTop = function(alwaysOnTop) {};
+
+
 /** @type {ChromeEvent} */
 chrome.app.window.AppWindow.prototype.onBoundsChanged;
 
@@ -1603,6 +1618,13 @@ chrome.idle = {};
 chrome.idle.queryState = function(thresholdSeconds, callback) {};
 
 
+/**
+ * @param {number} intervalInSeconds Threshold, in seconds, used to determine
+ *    when the system is in an idle state.
+ */
+chrome.idle.setDetectionInterval = function(intervalInSeconds) {};
+
+
 /** @type {ChromeEvent} */
 chrome.idle.onStateChanged;
 
@@ -2058,6 +2080,7 @@ chrome.pageCapture.saveAsMHTML = function(details, callback) {};
  */
 chrome.permissions = {};
 
+
 /**
  * @typedef {{
  *   permissions: (Array.<string>|undefined),
@@ -2066,6 +2089,7 @@ chrome.permissions = {};
 * @see http://developer.chrome.com/extensions/permissions.html#type-Permissions
 */
 chrome.permissions.Permissions;
+
 
 /**
  * @param {!chrome.permissions.Permissions} permissions
@@ -2163,6 +2187,7 @@ chrome.proxy.onProxyError;
 chrome.socket = {};
 
 
+
 /**
  * @constructor
  */
@@ -2171,6 +2196,7 @@ chrome.socket.CreateInfo = function() {};
 
 /** @type {number} */
 chrome.socket.CreateInfo.prototype.socketId;
+
 
 
 /**
@@ -2187,6 +2213,7 @@ chrome.socket.ReadInfo.prototype.resultCode;
 chrome.socket.ReadInfo.prototype.data;
 
 
+
 /**
  * @constructor
  */
@@ -2195,6 +2222,7 @@ chrome.socket.WriteInfo = function() {};
 
 /** @type {number} */
 chrome.socket.WriteInfo.prototype.bytesWritten;
+
 
 
 /**
@@ -2219,6 +2247,7 @@ chrome.socket.RecvFromInfo.prototype.address;
 chrome.socket.RecvFromInfo.prototype.port;
 
 
+
 /**
  * @constructor
  */
@@ -2231,6 +2260,7 @@ chrome.socket.AcceptInfo.prototype.resultCode;
 
 /** @type {(number|undefined)} */
 chrome.socket.AcceptInfo.prototype.socketId;
+
 
 
 /**
@@ -2261,6 +2291,7 @@ chrome.socket.SocketInfo.prototype.localAddress;
 
 /** @type {(number|undefined)} */
 chrome.socket.SocketInfo.prototype.localPort;
+
 
 
 /**
@@ -2480,6 +2511,139 @@ chrome.storage.local;
 
 /** @type {!StorageChangeEvent} */
 chrome.storage.onChanged;
+
+
+/** @const */
+chrome.system = {};
+
+
+/**
+ * @const
+ * @see http://developer.chrome.com/apps/system_display.html
+ */
+chrome.system.display = {};
+
+
+/** @type {ChromeEvent} */
+chrome.system.display.onDisplayChanged;
+
+
+/**
+ * @constructor
+ */
+chrome.system.display.Bounds = function() {};
+
+
+/** @type {number} */
+chrome.system.display.Bounds.prototype.left;
+
+
+/** @type {number} */
+chrome.system.display.Bounds.prototype.top;
+
+
+/** @type {number} */
+chrome.system.display.Bounds.prototype.width;
+
+
+/** @type {number} */
+chrome.system.display.Bounds.prototype.height;
+
+
+/**
+ * @typedef {{
+ *   left: (number|undefined),
+ *   top: (number|undefined),
+ *   right: (number|undefined),
+ *   bottom: (number|undefined)
+ * }}
+ */
+chrome.system.display.Insets;
+
+
+/**
+ * @constructor
+ */
+chrome.system.display.DisplayInfo = function() {};
+
+
+/** @type {string} */
+chrome.system.display.DisplayInfo.prototype.id;
+
+
+/** @type {string} */
+chrome.system.display.DisplayInfo.prototype.name;
+
+
+/** @type {string} */
+chrome.system.display.DisplayInfo.prototype.mirroringSourceId;
+
+
+/** @type {boolean} */
+chrome.system.display.DisplayInfo.prototype.isPrimary;
+
+
+/** @type {boolean} */
+chrome.system.display.DisplayInfo.prototype.isInternal;
+
+
+/** @type {boolean} */
+chrome.system.display.DisplayInfo.prototype.isEnabled;
+
+
+/** @type {number} */
+chrome.system.display.DisplayInfo.prototype.dpiX;
+
+
+/** @type {number} */
+chrome.system.display.DisplayInfo.prototype.dpiY;
+
+
+/** @type {number} */
+chrome.system.display.DisplayInfo.prototype.rotation;
+
+
+/** @type {!chrome.system.display.Bounds} */
+chrome.system.display.DisplayInfo.prototype.bounds;
+
+
+/** @type {!chrome.system.display.Insets} */
+chrome.system.display.DisplayInfo.prototype.overscan;
+
+
+/** @type {!chrome.system.display.Bounds} */
+chrome.system.display.DisplayInfo.prototype.workArea;
+
+
+/**
+ * @typedef {{
+ *   mirroringSourceId: (string|undefined),
+ *   isPrimary: (boolean|undefined),
+ *   overscan: (!chrome.system.display.Insets|undefined),
+ *   rotation: (number|undefined),
+ *   boundsOriginX: (number|undefined),
+ *   boundsOriginY: (number|undefined)
+ * }}
+ */
+chrome.system.display.SettableDisplayInfo;
+
+
+/**
+ * @param {function(!Array.<!chrome.system.display.DisplayInfo>)}
+ *     callback Called with an array of objects representing display info.
+ */
+chrome.system.display.getInfo = function(callback) {};
+
+
+/**
+ * @param {string} id The display's unique identifier.
+ * @param {!chrome.system.display.SettableDisplayInfo} info The information
+ *     about display properties that should be changed.
+ * @param {function()=} opt_callback The callback to execute when the display
+ *     info has been changed.
+ */
+chrome.system.display.setDisplayProperties =
+    function(id, info, opt_callback) {};
 
 
 /**
@@ -2720,7 +2884,7 @@ ExtensionInfo.prototype.appLaunchUrl;
 
 
 /** @type {string} */
-ExtensionInfo.prototype.homePageUrl;
+ExtensionInfo.prototype.homepageUrl;
 
 
 /** @type {string} */
@@ -3780,3 +3944,528 @@ chrome.fileSystem.isRestorable = function(id, callback) {};
  * @see http://developer.chrome.com/apps/fileSystem.html#method-retainEntry
  */
 chrome.fileSystem.retainEntry = function(entry) {};
+
+
+/**
+ * @const
+ * @see http://developer.chrome.com/extensions/alarms.html
+ */
+chrome.alarms = {};
+
+
+/**
+ * Creates an alarm. Near the time(s) specified by alarmInfo, the onAlarm event
+ * is fired. If there is another alarm with the same name (or no name if none is
+ * specified), it will be cancelled and replaced by this alarm.
+ * @param {string|!chrome.alarms.AlarmCreateInfo} nameOrAlarmCreateInfo Either
+ *     the name to identify this alarm or the info used to create the alarm. If
+ *     no name is passed, the empty string is used to identify the alarm.
+ * @param {!chrome.alarms.AlarmCreateInfo=} opt_alarmInfo If a name was passed
+ *     as arg1, the info used to create the alarm.
+ * @see http://developer.chrome.com/extensions/alarms.html#method-create
+ */
+chrome.alarms.create = function(nameOrAlarmCreateInfo, opt_alarmInfo) {};
+
+
+/**
+ * Retrieves details about the specified alarm.
+ * @param {string|!function(!chrome.alarms.Alarm)} nameOrCallback The name
+ *     of the alarm to get or the callback to invoke with the alarm. If no name
+ *     is passed, the empty string is used to get the alarm.
+ * @param {!function(!chrome.alarms.Alarm)=} opt_callback If a name was passed
+ *     as arg1, the callback to invoke with the alarm.
+ * @see http://developer.chrome.com/extensions/alarms.html#method-get
+ */
+chrome.alarms.get = function(nameOrCallback, opt_callback) {};
+
+
+/**
+ * Gets an array of all the alarms.
+ * @param {function(!Array.<!chrome.alarms.Alarm>)} callback
+ * @see http://developer.chrome.com/extensions/alarms.html#method-getAll
+ */
+chrome.alarms.getAll = function(callback) {};
+
+
+/**
+ * Clears the alarm with the given name.
+ * @param {string=} opt_name
+ * @see http://developer.chrome.com/extensions/alarms.html#method-clear
+ */
+chrome.alarms.clear = function(opt_name) {};
+
+
+/**
+ * Clears all alarms.
+ * @see http://developer.chrome.com/extensions/alarms.html#method-clearAll
+ */
+chrome.alarms.clearAll = function() {};
+
+
+/**
+ * Fired when an alarm has elapsed. Useful for event pages.
+ * @type {!chrome.alarms.AlarmEvent}
+ * @see http://developer.chrome.com/extensions/alarms.html#event-onAlarm
+ */
+chrome.alarms.onAlarm;
+
+
+
+/**
+ * @constructor
+ */
+chrome.alarms.AlarmEvent = function() {};
+
+
+/**
+ * @param {function(!chrome.alarms.Alarm): void} callback
+ */
+chrome.alarms.AlarmEvent.prototype.addListener = function(callback) {};
+
+
+/**
+ * @param {function(!chrome.alarms.Alarm): void} callback
+ */
+chrome.alarms.AlarmEvent.prototype.removeListener = function(callback) {};
+
+
+/**
+ * @param {function(!chrome.alarms.Alarm): void} callback
+ * @return {boolean}
+ */
+chrome.alarms.AlarmEvent.prototype.hasListener = function(callback) {};
+
+
+/**
+ * @return {boolean}
+ */
+chrome.alarms.AlarmEvent.prototype.hasListeners = function() {};
+
+
+
+/**
+ * @interface
+ * @see http://developer.chrome.com/extensions/alarms.html#type-Alarm
+ */
+chrome.alarms.Alarm = function() {};
+
+
+/**
+ * Name of this alarm.
+ * @type {string}
+ */
+chrome.alarms.Alarm.prototype.name;
+
+
+/**
+ * Time at which this alarm was scheduled to fire, in milliseconds past the
+ * epoch (e.g. Date.now() + n). For performance reasons, the alarm may have been
+ * delayed an arbitrary amount beyond this.
+ * @type {number}
+ */
+chrome.alarms.Alarm.prototype.scheduledTime;
+
+
+/**
+ * If not null, the alarm is a repeating alarm and will fire again in
+ * periodInMinutes minutes.
+ * @type {?number}
+ */
+chrome.alarms.Alarm.prototype.periodInMinutes;
+
+
+/**
+ * @typedef {{
+ *   when: (number|undefined),
+ *   delayInMinutes: (number|undefined),
+ *   periodInMinutes: (number|undefined)
+ * }}
+ * @see http://developer.chrome.com/extensions/alarms.html#method-create
+ */
+chrome.alarms.AlarmCreateInfo;
+
+
+/**
+ * @see http://developer.chrome.com/extensions/notifications.html
+ * @const
+ */
+chrome.notifications = {};
+
+
+/**
+ * @typedef {{
+ *   title: string,
+ *   iconUrl: (string|undefined)
+ * }}
+ * @see http://developer.chrome.com/extensions/notifications.html#type-NotificationOptions
+ */
+chrome.notifications.NotificationButton;
+
+
+/**
+ * @typedef {{
+ *   title: string,
+ *   message: string
+ * }}
+ * @see http://developer.chrome.com/extensions/notifications.html#type-NotificationOptions
+ */
+chrome.notifications.NotificationItem;
+
+
+/**
+ * @typedef {{
+ *   type: (string|undefined),
+ *   iconUrl: (string|undefined),
+ *   title: (string|undefined),
+ *   message: (string|undefined),
+ *   contextMessage: (string|undefined),
+ *   priority: (number|undefined),
+ *   eventTime: (number|undefined),
+ *   buttons: (!Array.<!chrome.notifications.NotificationButton>|undefined),
+ *   imageUrl: (string|undefined),
+ *   items: (!Array.<!chrome.notifications.NotificationItem>|undefined),
+ *   progress: (number|undefined),
+ *   isClickable: (boolean|undefined)
+ * }}
+ * @see http://developer.chrome.com/extensions/notifications.html#type-NotificationOptions
+ */
+chrome.notifications.NotificationOptions;
+
+
+/**
+ * @typedef {function(string): void}
+ * @see http://developer.chrome.com/extensions/notifications.html#method-create
+ * @see http://developer.chrome.com/extensions/notifications.html#event-onClicked
+ */
+chrome.notifications.StringCallback;
+
+
+/**
+ * @typedef {function(boolean): void}
+ * @see http://developer.chrome.com/extensions/notifications.html#method-update
+ * @see http://developer.chrome.com/extensions/notifications.html#method-clear
+ */
+chrome.notifications.BooleanCallback;
+
+
+/**
+ * @typedef {function(!Object): void}
+ * @see http://developer.chrome.com/extensions/notifications.html#method-getAll
+ */
+chrome.notifications.ObjectCallback;
+
+
+/**
+ * @typedef {function(string, boolean): void}
+ * @see http://developer.chrome.com/extensions/notifications.html#event-onClosed
+ */
+chrome.notifications.ClosedCallback;
+
+
+/**
+ * @typedef {function(string, number): void}
+ * @see http://developer.chrome.com/extensions/notifications.html#event-onButtonClicked
+ */
+chrome.notifications.ButtonCallback;
+
+
+/**
+ * @param {string} notificationId
+ * @param {!chrome.notifications.NotificationOptions} options
+ * @param {!chrome.notifications.StringCallback} callback
+ * @see http://developer.chrome.com/extensions/notifications.html#method-create
+ */
+chrome.notifications.create = function(notificationId, options, callback) {};
+
+
+/**
+ * @param {string} notificationId
+ * @param {!chrome.notifications.NotificationOptions} options
+ * @param {!chrome.notifications.BooleanCallback} callback
+ * @see http://developer.chrome.com/extensions/notifications.html#method-update
+ */
+chrome.notifications.update = function(notificationId, options, callback) {};
+
+
+/**
+ * @param {string} notificationId
+ * @param {!chrome.notifications.BooleanCallback} callback
+ * @see http://developer.chrome.com/extensions/notifications.html#method-clear
+ */
+chrome.notifications.clear = function(notificationId, callback) {};
+
+
+/**
+ * @type {!chrome.notifications.ClosedEvent}
+ * @see http://developer.chrome.com/extensions/notifications.html#event-onClosed
+ */
+chrome.notifications.onClosed;
+
+
+/**
+ * @type {!chrome.notifications.ClickedEvent}
+ * @see http://developer.chrome.com/extensions/notifications.html#event-onClicked
+ */
+chrome.notifications.onClicked;
+
+
+/**
+ * @type {!chrome.notifications.ButtonClickedEvent}
+ * @see http://developer.chrome.com/extensions/notifications.html#event-onButtonClicked
+ */
+chrome.notifications.onButtonClicked;
+
+
+
+/**
+ * @interface
+ * @see http://developer.chrome.com/extensions/notifications.html#event-onClosed
+ */
+chrome.notifications.ClosedEvent = function() {};
+
+
+/**
+ * @param {!chrome.notifications.ClosedCallback} callback
+ */
+chrome.notifications.ClosedEvent.prototype.addListener = function(callback) {};
+
+
+
+/**
+ * @interface
+ * @see http://developer.chrome.com/extensions/notifications.html#event-onClicked
+ */
+chrome.notifications.ClickedEvent = function() {};
+
+
+/**
+ * @param {!chrome.notifications.StringCallback} callback
+ */
+chrome.notifications.ClickedEvent.prototype.addListener = function(callback) {};
+
+
+
+/**
+ * @interface
+ * @see http://developer.chrome.com/extensions/notifications.html#event-onButtonClicked
+ */
+chrome.notifications.ButtonClickedEvent = function() {};
+
+
+/**
+ * @param {!chrome.notifications.ButtonCallback} callback
+ */
+chrome.notifications.ButtonClickedEvent.prototype.addListener =
+    function(callback) {};
+
+
+/**
+ * @const
+ */
+chrome.musicManagerPrivate = {};
+
+
+/**
+ * @param {function(string): void} callback
+ */
+chrome.musicManagerPrivate.getDeviceId = function(callback) {};
+
+
+/**
+ * @const
+ */
+chrome.mediaGalleriesPrivate = {};
+
+
+/**
+ * @typedef {function({deviceId: string, deviceName: string}): void}
+ */
+chrome.mediaGalleriesPrivate.DeviceCallback;
+
+
+/**
+ * @typedef {function({galleryId: string}): void}
+ */
+chrome.mediaGalleriesPrivate.GalleryChangeCallback;
+
+
+/**
+ * @typedef {function({galleryId: string, success: boolean}): void}
+ */
+chrome.mediaGalleriesPrivate.AddGalleryWatchCallback;
+
+
+/**
+ * @param {string} galleryId
+ * @param {!chrome.mediaGalleriesPrivate.AddGalleryWatchCallback} callback
+ */
+chrome.mediaGalleriesPrivate.addGalleryWatch = function(galleryId, callback) {};
+
+
+/**
+ * @type {!chrome.mediaGalleriesPrivate.DeviceEvent}
+ * @deprecated Use {chrome.system.storage.onAttach}.
+ */
+chrome.mediaGalleriesPrivate.onDeviceAttached;
+
+
+/**
+ * @type {!chrome.mediaGalleriesPrivate.DeviceEvent}
+ * @deprecated Use {chrome.system.storage.onDetach}.
+ */
+chrome.mediaGalleriesPrivate.onDeviceDetached;
+
+
+/**
+ * @type {!chrome.mediaGalleriesPrivate.GalleryChangeEvent}
+ */
+chrome.mediaGalleriesPrivate.onGalleryChanged;
+
+
+
+/**
+ * @interface
+ * @deprecated Use {chrome.system.storage.DeviceEvent}.
+ */
+chrome.mediaGalleriesPrivate.DeviceEvent = function() {};
+
+
+/**
+ * @param {!chrome.mediaGalleriesPrivate.DeviceCallback} callback
+ * @deprecated Use {chrome.system.storage.DeviceEvent.addListener}.
+ */
+chrome.mediaGalleriesPrivate.DeviceEvent.prototype.addListener =
+    function(callback) {};
+
+
+
+/**
+ * @interface
+ */
+chrome.mediaGalleriesPrivate.GalleryChangeEvent = function() {};
+
+
+/**
+ * @param {!chrome.mediaGalleriesPrivate.GalleryChangeCallback} callback
+ */
+chrome.mediaGalleriesPrivate.GalleryChangeEvent.prototype.addListener =
+    function(callback) {};
+
+
+
+/**
+ * Event whose listeners take a string parameter.
+ * @constructor
+ */
+chrome.system.StringEvent = function() {};
+
+
+/** @param {function(string): void} callback */
+chrome.system.StringEvent.prototype.addListener = function(callback) {};
+
+
+/** @param {function(string): void} callback */
+chrome.system.StringEvent.prototype.removeListener = function(callback) {};
+
+
+/**
+ * @param {function(string): void} callback
+ * @return {boolean}
+ */
+chrome.system.StringEvent.prototype.hasListener = function(callback) {};
+
+
+/** @return {boolean} */
+chrome.system.StringEvent.prototype.hasListeners = function() {};
+
+
+/**
+ * @const
+ * @see http://developer.chrome.com/apps/system_storage.html
+ */
+chrome.system.storage = {};
+
+
+
+/** @constructor */
+chrome.system.storage.StorageUnitInfo = function() {};
+
+
+/** @type {string} */
+chrome.system.storage.StorageUnitInfo.id;
+
+
+/** @type {string} */
+chrome.system.storage.StorageUnitInfo.name;
+
+
+/** @type {string} Any of 'fixed', 'removable', or 'unknown' */
+chrome.system.storage.StorageUnitInfo.type;
+
+
+/** @type {number} */
+chrome.system.storage.StorageUnitInfo.capacity;
+
+
+
+/**
+ * Event whose listeners take a StorageUnitInfoEvent parameter.
+ * @constructor
+ */
+chrome.system.storage.StorageUnitInfoEvent = function() {};
+
+
+/** @param {function(!chrome.system.storage.StorageUnitInfo): void} callback */
+chrome.system.storage.StorageUnitInfoEvent.prototype.addListener =
+    function(callback) {};
+
+
+/** @param {function(!chrome.system.storage.StorageUnitInfo): void} callback */
+chrome.system.storage.StorageUnitInfoEvent.prototype.removeListener =
+    function(callback) {};
+
+
+/**
+ * @param {function(!chrome.system.storage.StorageUnitInfo): void} callback
+ * @return {boolean}
+ */
+chrome.system.storage.StorageUnitInfoEvent.prototype.hasListener =
+    function(callback) {};
+
+
+/** @return {boolean} */
+chrome.system.storage.StorageUnitInfoEvent.prototype.hasListeners =
+    function() {};
+
+
+/** @type {chrome.system.storage.StorageUnitInfoEvent} */
+chrome.system.storage.onAttached;
+
+
+/** @type {!chrome.system.StringEvent} */
+chrome.system.storage.onDetached;
+
+
+/**
+ * Gets the storage information from the system.
+ * @param {function(!Array.<!chrome.system.storage.StorageUnitInfo>)} callback
+ */
+chrome.system.storage.getInfo = function(callback) {};
+
+
+/**
+ * Ejects a removable storage device.
+ * @param {string} id The transient device ID from StorageUnitInfo.
+ * @param {function(string)} callback Callback function where the value
+ *     is any of: "success", "in_use", "no_such_device", "failure"
+ */
+chrome.system.storage.ejectDevice = function(id, callback) {};
+
+
+/**
+ * Gets the available capacity of a specified storage device.
+ * @param {string} id The transient device ID from StorageUnitInfo.
+ * @param {function(Object.<string, number>)} callback A callback function that
+ *     accepts an object with {@code id} and {@code availableCapacity} fields.
+ */
+chrome.system.storage.getAvailableCapacity = function(id, callback) {};

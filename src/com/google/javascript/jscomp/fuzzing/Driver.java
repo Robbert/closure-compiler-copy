@@ -15,75 +15,165 @@
  */
 package com.google.javascript.jscomp.fuzzing;
 
+import com.google.javascript.jscomp.CommandLineRunner;
+import com.google.javascript.jscomp.CompilationLevel;
 import com.google.javascript.jscomp.Compiler;
 import com.google.javascript.jscomp.CompilerInput;
 import com.google.javascript.jscomp.CompilerOptions;
 import com.google.javascript.jscomp.JSModule;
-import com.google.javascript.jscomp.JsAst;
 import com.google.javascript.jscomp.Result;
 import com.google.javascript.jscomp.SourceFile;
-import com.google.javascript.rhino.InputId;
+import com.google.javascript.jscomp.SyntheticAst;
 import com.google.javascript.rhino.Node;
-import com.google.javascript.rhino.Token;
 
-import java.util.ArrayList;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
+
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * UNDER DEVELOPMENT. DO NOT USE!
  * @author zplin@google.com (Zhongpeng Lin)
  */
 public class Driver {
+  @Option(name = "--number_of_runs",
+      usage = "The number of runs of the fuzzer. Default: 1")
+  private int numberOfRuns = 1;
 
-  public Compiler compile(String code) {
+  @Option(name = "--max_ast_size",
+      usage = "The max number of nodes in the generated ASTs. Default: 100")
+  private int maxASTSize = 100;
+
+  @Option(name = "--compilation_level",
+      usage = "Specifies the compilation level to use. " +
+      "Default: SIMPLE_OPTIMIZATIONS")
+  private CompilationLevel compilationLevel =
+      CompilationLevel.SIMPLE_OPTIMIZATIONS;
+
+  @Option(name = "--seed",
+      usage = "Specifies the seed for the fuzzer. "
+          + "If not given, System.currentTimeMillis() will be used")
+  private long seed = -1;
+
+  @Option(name = "--logging_level",
+      usage = "Specifies the logging level for the driver. "
+          + "Default: INFO")
+  private LoggingLevel level = LoggingLevel.INFO;
+
+  public Result compile(String code) throws IOException {
     Compiler compiler = new Compiler();
-    compiler.compile(Arrays.asList(SourceFile.fromCode("[externs]", "")),
+    return compiler.compile(CommandLineRunner.getDefaultExterns(),
         Arrays.asList(SourceFile.fromCode("[fuzzedCode]", code)), getOptions());
-    return compiler;
   }
 
-  public Compiler compile(Node root) {
-    Node script = new Node(Token.SCRIPT, root);
-    script.setSourceFileForTesting("fuzzedFile");
-    InputId inputId = new InputId("fuzzedInput");
-    script.setInputId(inputId);
-
-    CompilerInput input = new CompilerInput(new JsAst(script));
+  public Result compile(Node script) throws IOException {
+    CompilerInput input = new CompilerInput(new SyntheticAst(script));
     JSModule jsModule = new JSModule("fuzzedModule");
     jsModule.add(input);
 
     Compiler compiler = new Compiler();
-    compiler.compileModules(
-        new ArrayList<SourceFile>(), Arrays.asList(jsModule), getOptions());
-    return compiler;
+    compiler.setTimeout(30);
+    return compiler.compileModules(
+        CommandLineRunner.getDefaultExterns(),
+        Arrays.asList(jsModule), getOptions());
   }
 
   private CompilerOptions getOptions() {
     CompilerOptions options = new CompilerOptions();
+    compilationLevel.setOptionsForCompilationLevel(options);
     return options;
   }
 
   public static void main(String[] args) {
-    int numberOfRuns = Integer.valueOf(args[0]);
-    int maxASTSize = Integer.valueOf(args[1]);
     Driver driver = new Driver();
-    for (int i = 0; i < numberOfRuns; i++) {
-      long seed = System.currentTimeMillis();
+    CmdLineParser parser = new CmdLineParser(driver);
+    try {
+      parser.parseArgument(args);
+    } catch (CmdLineException e) {
+      // handling of wrong arguments
+      System.err.println(e.getMessage());
+      parser.printUsage(System.err);
+      System.exit(1);
+    }
+    Logger logger = Logger.getLogger(Driver.class.getName());
+    logger.setLevel(driver.level.getLevel());
+    if (driver.seed != -1) {
+      // When user specifies seed, only run once
+      driver.numberOfRuns = 1;
+    }
+    for (int i = 0; i < driver.numberOfRuns; i++) {
+      logger.info("Running fuzzer [" + i + " of " +
+          driver.numberOfRuns + "]");
+      long seed;
+      if (driver.seed == -1) {
+        seed = System.currentTimeMillis();
+      } else {
+        seed = driver.seed;
+      }
       Random random = new Random(seed);
-      System.out.println("Seed: " + seed);
       Fuzzer fuzzer = new Fuzzer(random);
-      Node root = new Node(Token.EXPR_RESULT,
-          fuzzer.generateExpression(maxASTSize));
-      String code = Fuzzer.getPrettyCode(root);
-      System.out.print(code);
-
-      Compiler compiler = driver.compile(root);
-      Result result = compiler.getResult();
-      if (result.success) {
-        System.out.println("Success!\n");
+      Node[] nodes = null;
+      try {
+        nodes = fuzzer.generateProgram(driver.maxASTSize);
+      } catch (Exception e) {
+        logger.log(Level.SEVERE, "Fuzzer error!\nSeed: " + seed, e);
+      }
+      Node script = Fuzzer.buildScript(nodes);
+      String code = Fuzzer.getPrettyCode(script);
+      try {
+        Result result = driver.compile(script);
+        if (result.success && result.warnings.length == 0) {
+          logger.info("Compilation Succeeded!\n");
+          StringBuffer sb = new StringBuffer("Seed: ");
+          sb.append(seed);
+          sb.append("\nJavaScript: ");
+          sb.append(code);
+          logger.fine(sb.toString());
+        } else {
+          StringBuffer sb = new StringBuffer("Compilation Failed!\nSeed: ");
+          sb.append(seed);
+          sb.append("\nJavaScript: ");
+          sb.append(code);
+          logger.warning(sb.toString());
+        }
+      } catch (Exception e) {
+        StringBuffer sb = new StringBuffer("Compiler error!\nSeed: ");
+        sb.append(seed);
+        sb.append("\nJavaScript: ");
+        sb.append(code);
+        logger.log(Level.SEVERE, sb.toString(), e);
       }
     }
+    System.out.println("Done!");
+    System.exit(0);
   }
 
+  enum LoggingLevel {
+    OFF(Level.OFF),
+    SEVERE(Level.SEVERE),
+    WARNING(Level.WARNING),
+    INFO(Level.INFO),
+    CONFIG(Level.CONFIG),
+    FINE(Level.FINE),
+    FINER(Level.FINER),
+    FINEST(Level.FINEST),
+    ALL(Level.ALL);
+
+    private Level level;
+
+    private LoggingLevel(Level l) {
+      level = l;
+    }
+    /**
+     * @return the level
+     */
+    public Level getLevel() {
+      return level;
+    }
+  }
 }

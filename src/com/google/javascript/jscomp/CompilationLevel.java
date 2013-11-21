@@ -179,7 +179,6 @@ public enum CompilationLevel {
     // Stricter warnings:
     options.reportMissingOverride = CheckLevel.WARNING;
     options.aggressiveVarCheck = CheckLevel.WARNING;
-    options.reportUnknownTypes = CheckLevel.WARNING;
     options.checkMissingReturn = CheckLevel.WARNING;
 
     // Obfuscation

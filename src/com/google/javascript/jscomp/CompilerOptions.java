@@ -325,6 +325,9 @@ public class CompilerOptions implements Serializable, Cloneable {
   /** Removes code associated with unused global names */
   public boolean smartNameRemoval;
 
+  /** Removes code associated with unused global names */
+  boolean extraSmartNameRemoval;
+
   /** Removes code that will never execute */
   public boolean removeDeadCode;
 
@@ -625,6 +628,9 @@ public class CompilerOptions implements Serializable, Cloneable {
 
   /** Processes goog.provide() and goog.require() calls */
   public boolean closurePass;
+
+  /** Do not strip goog.require() calls from the code. */
+  public boolean preserveGoogRequires;
 
   /** Processes jQuery aliases */
   public boolean jqueryPass;
@@ -950,6 +956,7 @@ public class CompilerOptions implements Serializable, Cloneable {
     inlineVariables = false;
     inlineLocalVariables = false;
     smartNameRemoval = false;
+    extraSmartNameRemoval = false;
     removeDeadCode = false;
     extractPrototypeMemberDeclarations = false;
     removeUnusedPrototypeProperties = false;
@@ -998,6 +1005,7 @@ public class CompilerOptions implements Serializable, Cloneable {
     markAsCompiled = false;
     removeTryCatchFinally = false;
     closurePass = false;
+    preserveGoogRequires = false;
     jqueryPass = false;
     angularPass = false;
     removeAbstractMethods = true;
@@ -1784,6 +1792,10 @@ public class CompilerOptions implements Serializable, Cloneable {
     this.smartNameRemoval = smartNameRemoval;
   }
 
+  public void setExtraSmartNameRemoval(boolean smartNameRemoval) {
+    this.extraSmartNameRemoval = smartNameRemoval;
+  }
+
   public void setRemoveDeadCode(boolean removeDeadCode) {
     this.removeDeadCode = removeDeadCode;
   }
@@ -1999,6 +2011,10 @@ public class CompilerOptions implements Serializable, Cloneable {
 
   public void setClosurePass(boolean closurePass) {
     this.closurePass = closurePass;
+  }
+
+  public void setPreserveGoogRequires(boolean preserveGoogRequires) {
+    this.preserveGoogRequires = preserveGoogRequires;
   }
 
   public void setGatherCssNames(boolean gatherCssNames) {

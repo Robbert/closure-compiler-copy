@@ -211,6 +211,12 @@ Console.prototype.memory;
 Window.prototype.console;
 
 /**
+ * @type {Console}
+ * @suppress {duplicate}
+ */
+var console;
+
+/**
  * @type {number}
  * @see http://developer.android.com/reference/android/webkit/WebView.html
  */

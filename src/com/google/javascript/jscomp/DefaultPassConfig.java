@@ -284,6 +284,8 @@ public class DefaultPassConfig extends PassConfig {
       checks.add(objectPropertyStringPreprocess);
     }
 
+    checks.add(createEmptyPass("beforeTypeChecking"));
+
     if (options.checkTypes || options.inferTypes) {
       checks.add(resolveTypes);
       checks.add(inferTypes);
@@ -428,6 +430,13 @@ public class DefaultPassConfig extends PassConfig {
       passes.add(tightenTypesBuilder);
     }
 
+    // Running this pass before disambiguate properties allow the removing
+    // unused methods that share the same name as methods called from unused
+    // code.
+    if (options.extraSmartNameRemoval && options.smartNameRemoval) {
+      passes.add(smartNamePass);
+    }
+
     // Property disambiguation should only run once and needs to be done
     // soon after type checking, both so that it can make use of type
     // information and so that other passes can take advantage of the renamed
@@ -460,6 +469,10 @@ public class DefaultPassConfig extends PassConfig {
     // TODO(johnlenz): make checkConsts namespace aware so it can be run
     // as during the checks phase.
     passes.add(checkConsts);
+
+    // Detects whether invocations of the method goog.string.Const.from are done
+    // with an argument which is a string literal.
+    passes.add(checkConstParams);
 
     // The Caja library adds properties to Object.prototype, which breaks
     // most for-in loops.  This adds a check to each loop that skips
@@ -967,7 +980,8 @@ public class DefaultPassConfig extends PassConfig {
       final ProcessClosurePrimitives pass = new ProcessClosurePrimitives(
           compiler,
           preprocessorSymbolTable,
-          options.brokenClosureRequiresLevel);
+          options.brokenClosureRequiresLevel,
+          options.preserveGoogRequires);
 
       return new HotSwapCompilerPass() {
         @Override
@@ -1428,6 +1442,15 @@ public class DefaultPassConfig extends PassConfig {
     }
   };
 
+  /** Checks that the arguments are constants */
+  final PassFactory checkConstParams =
+      new PassFactory("checkConstParams", true) {
+    @Override
+    protected CompilerPass create(AbstractCompiler compiler) {
+      return new ConstParamCheck(compiler);
+    }
+  };
+
   /** Check memory bloat patterns */
   final PassFactory checkEventfulObjectDisposal =
       new PassFactory("checkEventfulObjectDisposal", true) {
@@ -1770,6 +1793,8 @@ public class DefaultPassConfig extends PassConfig {
    * starting with minimum set of names.
    */
   final PassFactory smartNamePass = new PassFactory("smartNamePass", true) {
+    private boolean hasWrittenFile = false;
+
     @Override
     protected CompilerPass create(final AbstractCompiler compiler) {
       return new CompilerPass() {
@@ -1781,8 +1806,14 @@ public class DefaultPassConfig extends PassConfig {
           String reportPath = options.reportPath;
           if (reportPath != null) {
             try {
-              Files.write(na.getHtmlReport(), new File(reportPath),
-                  Charsets.UTF_8);
+              if (hasWrittenFile) {
+                Files.append(na.getHtmlReport(), new File(reportPath),
+                    Charsets.UTF_8);
+              } else {
+                Files.write(na.getHtmlReport(), new File(reportPath),
+                    Charsets.UTF_8);
+                hasWrittenFile = true;
+              }
             } catch (IOException e) {
               compiler.report(JSError.make(REPORT_PATH_IO_ERROR, reportPath));
             }
