@@ -764,7 +764,7 @@ Text.prototype.nodeType = Node.TEXT_NODE;
 
 /**
  * @override
- * @type {string}
+ * @type {!string}
  */
 Text.prototype.nodeValue;
 
@@ -791,7 +791,7 @@ Comment.prototype.nodeType = Node.COMMENT_NODE;
 
 /**
  * @override
- * @type {string}
+ * @type {!string}
  */
 Comment.prototype.nodeValue;
 
@@ -811,7 +811,7 @@ CDATASection.prototype.nodeType = Node.CDATA_SECTION_NODE;
 
 /**
  * @override
- * @type {string}
+ * @type {!string}
  */
 CDATASection.prototype.nodeValue;
 
