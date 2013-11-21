@@ -334,6 +334,14 @@ Window.prototype.dialogTop;
 Window.prototype.dialogWidth;
 
 /**
+ * Support for doScroll is removed in Internet Explorer 11:
+ * @see http://msdn.microsoft.com/en-us/library/ie/bg182625(v=vs.85).aspx
+ * 
+ * @param {string} component
+ */
+Window.prototype.doScroll = function (component) {};
+
+/**
  * @see http://msdn.microsoft.com/en-us/library/ms535863(VS.85).aspx
  */
 Window.prototype.event;
