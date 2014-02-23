@@ -61,14 +61,14 @@ var arguments;
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Properties/Infinity
  * @const
  */
-var Infinity;
+var Infinity = 1 / 0;
 
 /**
  * @type {number}
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Properties/NaN
  * @const
  */
-var NaN;
+var NaN = 0 / 0;
 
 /**
  * @type {undefined}
@@ -893,14 +893,14 @@ Number.NaN = 0 / 0;
  * @type {number}
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Number/NEGATIVE_INFINITY
  */
-Number.NEGATIVE_INFINITY = -Infinity;
+Number.NEGATIVE_INFINITY = 1 / -0;
 
 /**
  * @const
  * @type {number}
  * @see http://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Global_Objects/Number/POSITIVE_INFINITY
  */
-Number.POSITIVE_INFINITY = Infinity;
+Number.POSITIVE_INFINITY = 1 / 0;
 
 
 /**
